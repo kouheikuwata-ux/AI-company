@@ -1,0 +1,53 @@
+{
+  "cycle": 7,
+  "timestamp": "2026-02-02T14:50:00.000Z",
+  "theme": {
+    "title": "self-check の Company OS 観点での強化",
+    "classification": "A",
+    "classification_name": "ガバナンス/監査",
+    "selection_reason": "現在の self-check は基本的な構造チェックのみ。Company OS の責務・スキル・エージェントの整合性チェックを追加することで監査可能性を高める。"
+  },
+  "changes": {
+    "commits": [
+      "13d9390: feat: Add Company OS integrity checks to self-check"
+    ],
+    "files_modified": [
+      "scripts/self-check.js"
+    ],
+    "new_checks": [
+      "Skill count >= 10",
+      "All required categories exist",
+      "Agent definitions exist (>= 4 agents)",
+      "Design doc exists",
+      "Ops check infrastructure exists"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "self_check_items": 26,
+      "company_os_checks": 0
+    },
+    "after": {
+      "self_check_items": 31,
+      "company_os_checks": 5
+    }
+  },
+  "result": "improved",
+  "next_candidates": [
+    {
+      "priority": "P2",
+      "theme": "エージェント間通信の設計",
+      "reason": "設計図の「次のステップ」に記載"
+    },
+    {
+      "priority": "P3",
+      "theme": "スキル実行のDB連携強化",
+      "reason": "プレースホルダーデータを実データに置き換え"
+    },
+    {
+      "priority": "P3",
+      "theme": "Inngest cronジョブの実装確認",
+      "reason": "定期タスクが実際に動作するか確認"
+    }
+  ]
+}
