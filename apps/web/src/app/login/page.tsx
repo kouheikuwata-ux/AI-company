@@ -1,5 +1,6 @@
 'use client';
 
+// Login page v2 - force cache invalidation
 import { useState, useEffect, useRef } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 
