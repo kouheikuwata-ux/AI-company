@@ -46,6 +46,13 @@ export * from './types';
 // Registry
 export { agentRegistry, allAgents, organizationChart } from './registry';
 
+// Runner
+export { AgentRunner } from './runner';
+export type { AgentContext, AgentRunResult, Decision, DecisionAction } from './runner';
+
+// Decision Engine
+export { DecisionEngine, addCustomRule, getSkillRules } from './decision-engine';
+
 // Individual agent definitions
 export {
   ceoAgent,

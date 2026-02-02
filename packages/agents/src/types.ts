@@ -135,6 +135,7 @@ export const AgentSpecSchema = z.object({
   // Automation
   scheduled_tasks: z.array(z.object({
     task_key: z.string(),
+    description: z.string().optional(),
     cron: z.string(),
     skill_key: z.string(),
     default_input: z.record(z.unknown()).optional(),
@@ -143,8 +144,10 @@ export const AgentSpecSchema = z.object({
   // Triggers
   event_triggers: z.array(z.object({
     event_type: z.string(),
+    description: z.string().optional(),
     skill_key: z.string(),
     condition: z.string().optional(),
+    default_input: z.record(z.unknown()).optional(),
   })).default([]),
 
   // Status
@@ -157,6 +160,10 @@ export const AgentSpecSchema = z.object({
 });
 
 export type AgentSpec = z.infer<typeof AgentSpecSchema>;
+
+// Extracted types for convenience
+export type ScheduledTask = AgentSpec['scheduled_tasks'][number];
+export type EventTrigger = AgentSpec['event_triggers'][number];
 
 // =============================================================================
 // Agent Execution Context
