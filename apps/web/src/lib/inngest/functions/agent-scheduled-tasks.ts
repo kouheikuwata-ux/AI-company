@@ -481,6 +481,158 @@ export const ctoWeeklyImprovementProposals = inngest.createFunction(
 );
 
 // ============================================================
+// HR Manager Agent Scheduled Tasks
+// ============================================================
+
+/**
+ * HR Manager: 日次リクエストレビュー
+ * 平日10時
+ */
+export const hrDailyRequestReview = inngest.createFunction(
+  {
+    id: 'hr-daily-request-review',
+    name: 'HR Manager Agent: 日次リクエストレビュー',
+  },
+  { cron: '0 10 * * 1-5' },  // 平日10時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('hr-manager');
+    if (!agent) throw new Error('HR Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'daily-request-review');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `hr-request-${new Date().toISOString().split('T')[0]}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'hr-manager', task: 'daily-request-review' };
+  }
+);
+
+/**
+ * HR Manager: 週次スキル評価
+ * 毎週水曜14時
+ */
+export const hrWeeklySkillEvaluation = inngest.createFunction(
+  {
+    id: 'hr-weekly-skill-evaluation',
+    name: 'HR Manager Agent: 週次スキル評価',
+  },
+  { cron: '0 14 * * 3' },  // 毎週水曜14時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('hr-manager');
+    if (!agent) throw new Error('HR Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'weekly-skill-evaluation');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `hr-evaluation-${new Date().toISOString().split('T')[0]}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'hr-manager', task: 'weekly-skill-evaluation' };
+  }
+);
+
+/**
+ * HR Manager: 週次改善提案
+ * 毎週金曜15時
+ */
+export const hrWeeklyImprovementProposals = inngest.createFunction(
+  {
+    id: 'hr-weekly-improvement-proposals',
+    name: 'HR Manager Agent: 週次改善提案',
+  },
+  { cron: '0 15 * * 5' },  // 毎週金曜15時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('hr-manager');
+    if (!agent) throw new Error('HR Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'weekly-improvement-proposals');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `hr-improve-${new Date().toISOString().split('T')[0]}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'hr-manager', task: 'weekly-improvement-proposals' };
+  }
+);
+
+/**
+ * HR Manager: 月次廃止チェック
+ * 毎月1日10時
+ */
+export const hrMonthlyDeprecationCheck = inngest.createFunction(
+  {
+    id: 'hr-monthly-deprecation-check',
+    name: 'HR Manager Agent: 月次廃止チェック',
+  },
+  { cron: '0 10 1 * *' },  // 毎月1日10時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('hr-manager');
+    if (!agent) throw new Error('HR Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'monthly-deprecation-check');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `hr-deprecation-${new Date().toISOString().slice(0, 7)}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'hr-manager', task: 'monthly-deprecation-check' };
+  }
+);
+
+// ============================================================
 // Export all scheduled task functions
 // ============================================================
 
@@ -501,4 +653,9 @@ export const agentScheduledTaskFunctions = [
   ctoSkillPerformanceReview,
   ctoWeeklySecurityScan,
   ctoWeeklyImprovementProposals,
+  // HR Manager
+  hrDailyRequestReview,
+  hrWeeklySkillEvaluation,
+  hrWeeklyImprovementProposals,
+  hrMonthlyDeprecationCheck,
 ];
