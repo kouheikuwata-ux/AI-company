@@ -1,0 +1,52 @@
+{
+  "cycle": 9,
+  "timestamp": "2026-02-03T00:01:00.000Z",
+  "theme": {
+    "title": "HR Manager の Inngest cron タスク追加",
+    "classification": "D",
+    "classification_name": "自律性向上",
+    "selection_reason": "cycle08 の next_candidates に記載。HR Manager のスキルは全て実装済みだが、定期タスクが未定義だった。"
+  },
+  "changes": {
+    "commits": [
+      "45a4918: feat: Add HR Manager scheduled tasks to Inngest cron"
+    ],
+    "files_modified": [
+      "apps/web/src/lib/inngest/functions/agent-scheduled-tasks.ts"
+    ],
+    "tasks_added": [
+      "hr-daily-request-review (平日10時)",
+      "hr-weekly-skill-evaluation (水曜14時)",
+      "hr-weekly-improvement-proposals (金曜15時)",
+      "hr-monthly-deprecation-check (毎月1日10時)"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "scheduled_tasks": 12,
+      "agents_with_cron": ["ceo", "cfo", "coo", "cto"]
+    },
+    "after": {
+      "scheduled_tasks": 16,
+      "agents_with_cron": ["ceo", "cfo", "coo", "cto", "hr-manager"]
+    }
+  },
+  "result": "improved",
+  "next_candidates": [
+    {
+      "priority": "P2",
+      "theme": "CS Manager スキルの実装",
+      "reason": "CS Manager の定期タスクを追加するには、cs.feedback-analysis 等のスキルが必要"
+    },
+    {
+      "priority": "P2",
+      "theme": "エージェント間通信の設計",
+      "reason": "設計図の「次のステップ」に記載"
+    },
+    {
+      "priority": "P3",
+      "theme": "スキル実行のDB連携強化",
+      "reason": "プレースホルダーデータを実データに置き換え"
+    }
+  ]
+}
