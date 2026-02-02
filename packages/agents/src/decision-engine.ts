@@ -340,6 +340,110 @@ const SKILL_RULES: Record<string, DecisionRule[]> = {
     },
   ],
 
+  // スキルパフォーマンス改善提案のルール
+  'ai-affairs.performance-improvement': [
+    {
+      name: 'critical-proposals-found',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        const byPriority = summary?.by_priority as Record<string, number> | undefined;
+        return (byPriority?.critical as number) > 0;
+      },
+      actions: [
+        {
+          type: 'escalate',
+          target: 'cto',
+          message: 'クリティカルな改善提案があります。早急な対応が必要です。',
+          priority: 'high',
+        },
+      ],
+      analysis: 'クリティカル優先度の改善提案が検出されました。',
+      reasoning: 'critical優先度の提案があるため、CTOへエスカレーション',
+      severity: 'critical',
+    },
+    {
+      name: 'high-priority-proposals',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        const byPriority = summary?.by_priority as Record<string, number> | undefined;
+        return (byPriority?.high as number) >= 3;
+      },
+      actions: [
+        {
+          type: 'notify',
+          target: 'coo',
+          message: '高優先度の改善提案が複数あります。レビューを推奨します。',
+          priority: 'medium',
+        },
+      ],
+      analysis: '高優先度の改善提案が3件以上あります。',
+      reasoning: 'high優先度の提案が3件以上あるため、COOへ通知',
+      severity: 'warning',
+    },
+    {
+      name: 'low-health-score',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        return (summary?.overall_health_score as number) < 80;
+      },
+      actions: [
+        {
+          type: 'execute_skill',
+          skillKey: 'ai-affairs.skill-evaluation',
+          input: { evaluation_type: 'full', period: 'weekly' },
+          message: '全体的な健全性スコアが低いため詳細評価を実行',
+          priority: 'high',
+        },
+      ],
+      analysis: 'スキル全体の健全性スコアが80%を下回っています。',
+      reasoning: 'overall_health_score < 80% のため、詳細評価を実行',
+      severity: 'warning',
+    },
+    {
+      name: 'degrading-trends',
+      condition: (output) => {
+        const trends = output.trends as Record<string, string> | undefined;
+        return trends?.performance_trend === 'degrading' ||
+               trends?.reliability_trend === 'degrading';
+      },
+      actions: [
+        {
+          type: 'notify',
+          message: 'パフォーマンスまたは信頼性が悪化傾向にあります。',
+          priority: 'medium',
+        },
+      ],
+      analysis: 'スキルのパフォーマンスまたは信頼性が悪化傾向です。',
+      reasoning: 'トレンドがdegradingのため、通知',
+      severity: 'warning',
+    },
+    {
+      name: 'proposals-generated',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        return (summary?.total_proposals as number) > 0;
+      },
+      actions: [
+        {
+          type: 'log',
+          message: '改善提案が生成されました。レビューをお願いします。',
+          priority: 'low',
+        },
+      ],
+      analysis: '改善提案が生成されました。',
+      reasoning: '提案があるため、ログに記録',
+      severity: 'info',
+    },
+    {
+      name: 'no-proposals-needed',
+      condition: () => true,
+      actions: [],
+      analysis: '現在、改善が必要なスキルはありません。',
+      reasoning: '提案なし',
+      severity: 'info',
+    },
+  ],
+
   // スキル廃止チェックのルール
   'ai-affairs.skill-deprecation-check': [
     {

@@ -17,6 +17,7 @@ const skills = [
   { key: 'ai-affairs.request-intake', name: 'スキルリクエスト受付', description: '新規スキルリクエストの受付と自動トリアージ', category: 'ai-affairs' },
   { key: 'ai-affairs.skill-evaluation', name: 'スキル評価', description: '既存スキルのパフォーマンス評価', category: 'ai-affairs' },
   { key: 'ai-affairs.skill-deprecation-check', name: 'スキル廃止チェック', description: '使用されていないスキルや問題のあるスキルを検出', category: 'ai-affairs' },
+  { key: 'ai-affairs.performance-improvement', name: 'スキルパフォーマンス改善提案', description: 'スキルのパフォーマンスデータを分析し改善提案を生成', category: 'ai-affairs' },
 ];
 
 async function seed() {

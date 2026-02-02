@@ -40,6 +40,7 @@ export const hrManagerAgent: AgentSpec = {
     'ai-affairs.request-triage',
     'ai-affairs.skill-recommendation',
     'ai-affairs.skill-deprecation-check',
+    'ai-affairs.performance-improvement',
     'internal.summary.create',
   ],
 
@@ -64,6 +65,7 @@ export const hrManagerAgent: AgentSpec = {
   scheduled_tasks: [
     {
       task_key: 'daily-request-review',
+      description: '新規スキルリクエストの確認とトリアージ',
       cron: '0 10 * * 1-5',  // 平日10時
       skill_key: 'ai-affairs.request-intake',
       default_input: {
@@ -72,6 +74,7 @@ export const hrManagerAgent: AgentSpec = {
     },
     {
       task_key: 'weekly-skill-evaluation',
+      description: 'スキルのパフォーマンス評価',
       cron: '0 14 * * 3',  // 毎週水曜14時
       skill_key: 'ai-affairs.skill-evaluation',
       default_input: {
@@ -80,7 +83,18 @@ export const hrManagerAgent: AgentSpec = {
       },
     },
     {
+      task_key: 'weekly-improvement-proposals',
+      description: 'スキルパフォーマンス改善提案の生成',
+      cron: '0 15 * * 5',  // 毎週金曜15時
+      skill_key: 'ai-affairs.performance-improvement',
+      default_input: {
+        analysis_period: 'weekly',
+        max_proposals: 5,
+      },
+    },
+    {
       task_key: 'monthly-deprecation-check',
+      description: '非アクティブスキルの廃止候補チェック',
       cron: '0 10 1 * *',  // 毎月1日10時
       skill_key: 'ai-affairs.skill-deprecation-check',
       default_input: {
