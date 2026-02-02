@@ -148,7 +148,7 @@ export const spec: SkillSpec = {
   },
 
   safety: {
-    requires_approval: true, // 廃止候補リストは承認が必要
+    requires_approval: false, // チェックのみなので承認不要（実際の廃止は別スキル）
     timeout_seconds: 120,
     max_retries: 2,
     retry_delay_seconds: 10,
@@ -221,6 +221,46 @@ function determineRecommendation(
 }
 
 /**
+ * 注入されたメトリクスの型
+ */
+interface InjectedMetrics {
+  skills: Array<{
+    skill_key: string;
+    skill_name: string;
+    version: string;
+    usage: {
+      total_executions: number;
+      unique_users: number;
+      unique_agents: number;
+    };
+    performance: {
+      success_rate: number;
+      avg_latency_ms: number;
+      p95_latency_ms: number;
+      error_count: number;
+      timeout_count: number;
+    };
+    cost: {
+      total_cost: number;
+      avg_cost_per_execution: number;
+    };
+    last_used_at: string | null;
+    trend: 'improving' | 'stable' | 'degrading';
+  }>;
+  summary: {
+    total_executions: number;
+    success_rate: number;
+    total_cost: number;
+    avg_latency_ms: number;
+  };
+  period: {
+    start: string;
+    end: string;
+    days: number;
+  };
+}
+
+/**
  * スキル実行ハンドラー
  */
 export const execute: SkillHandler = async (
@@ -234,7 +274,11 @@ export const execute: SkillHandler = async (
     error_rate_threshold: parsed.error_rate_threshold,
   });
 
-  // プレースホルダーデータ（実際はDBから取得）
+  // 注入されたメトリクスを取得
+  const injectedMetrics = input._metrics as InjectedMetrics | undefined;
+  const now = new Date();
+
+  // 廃止候補を生成
   const candidates: Array<{
     skill_key: string;
     skill_name: string;
@@ -261,6 +305,97 @@ export const execute: SkillHandler = async (
     recommended_action: 'deprecate' | 'review' | 'monitor' | 'keep';
   }> = [];
 
+  let totalSkillsChecked = 0;
+  let healthySkillsCount = 0;
+  const warnings: Array<{
+    type: 'dependency_chain' | 'critical_agent_impact' | 'recent_activity';
+    message: string;
+    affected_skills: string[];
+  }> = [];
+
+  // 実データから廃止候補を検出
+  if (injectedMetrics?.skills) {
+    totalSkillsChecked = injectedMetrics.skills.length;
+
+    for (const skill of injectedMetrics.skills) {
+      const reasons: Array<{
+        type: 'inactivity' | 'high_error_rate' | 'low_cost_efficiency' | 'superseded' | 'deprecated_dependency';
+        description: string;
+        metric_value?: number;
+        threshold_value?: number;
+      }> = [];
+
+      // 最終使用日からの日数を計算
+      const daysSinceLastUse = skill.last_used_at
+        ? Math.floor((now.getTime() - new Date(skill.last_used_at).getTime()) / (24 * 60 * 60 * 1000))
+        : parsed.inactivity_threshold_days + 1;
+
+      // 非アクティブチェック
+      if (daysSinceLastUse > parsed.inactivity_threshold_days) {
+        reasons.push({
+          type: 'inactivity',
+          description: `${daysSinceLastUse}日間使用されていません`,
+          metric_value: daysSinceLastUse,
+          threshold_value: parsed.inactivity_threshold_days,
+        });
+      }
+
+      // エラー率チェック
+      const errorRate = 1 - skill.performance.success_rate;
+      if (errorRate > parsed.error_rate_threshold && skill.usage.total_executions >= parsed.min_executions_for_evaluation) {
+        reasons.push({
+          type: 'high_error_rate',
+          description: `エラー率が${(errorRate * 100).toFixed(1)}%と高い水準です`,
+          metric_value: errorRate,
+          threshold_value: parsed.error_rate_threshold,
+        });
+      }
+
+      // コスト効率チェック
+      const avgCostBenchmark = 0.01;
+      const costEfficiency = Math.min(1, avgCostBenchmark / (skill.cost.avg_cost_per_execution || avgCostBenchmark));
+      if (costEfficiency < parsed.cost_efficiency_threshold && skill.usage.total_executions >= parsed.min_executions_for_evaluation) {
+        reasons.push({
+          type: 'low_cost_efficiency',
+          description: `コスト効率が${(costEfficiency * 100).toFixed(1)}%と低い水準です`,
+          metric_value: costEfficiency,
+          threshold_value: parsed.cost_efficiency_threshold,
+        });
+      }
+
+      // 問題がある場合は候補に追加
+      if (reasons.length > 0) {
+        const dependencies = {
+          depends_on: [],
+          dependents: [],
+          agent_users: skill.usage.unique_agents > 0 ? [`${skill.usage.unique_agents} agents`] : [],
+        };
+
+        const impactLevel = calculateImpactLevel(dependencies);
+        const recommendedAction = determineRecommendation(reasons, impactLevel, daysSinceLastUse);
+
+        candidates.push({
+          skill_key: skill.skill_key,
+          skill_name: skill.skill_name,
+          version: skill.version,
+          reasons,
+          last_used_at: skill.last_used_at || undefined,
+          stats: {
+            total_executions: skill.usage.total_executions,
+            success_rate: skill.performance.success_rate,
+            avg_cost: skill.cost.avg_cost_per_execution,
+            days_since_last_use: daysSinceLastUse,
+          },
+          dependencies,
+          impact_level: impactLevel,
+          recommended_action: recommendedAction,
+        });
+      } else {
+        healthySkillsCount++;
+      }
+    }
+  }
+
   // 集計
   const byReason: Record<string, number> = {};
   const byImpact: Record<string, number> = { high: 0, medium: 0, low: 0 };
@@ -275,18 +410,18 @@ export const execute: SkillHandler = async (
   }
 
   const output: Output = {
-    checked_at: new Date().toISOString(),
+    checked_at: now.toISOString(),
     evaluation_period_days: parsed.inactivity_threshold_days,
     summary: {
-      total_skills_checked: 0, // 実際はDBから取得
+      total_skills_checked: totalSkillsChecked,
       deprecation_candidates: candidates.length,
       by_reason: byReason,
       by_impact: byImpact,
       by_recommendation: byRecommendation,
     },
     candidates,
-    healthy_skills_count: 0, // 実際はDBから取得
-    warnings: [],
+    healthy_skills_count: healthySkillsCount,
+    warnings,
   };
 
   context.logger.info('Deprecation check completed', {

@@ -11,6 +11,7 @@ import {
   BudgetService,
   AuditLogger,
   PIIGuard,
+  SkillMetricsService,
 } from '@ai-company-os/runner';
 import { createLLMClient } from '@/lib/llm/client';
 
@@ -142,14 +143,54 @@ export async function POST(
       llmClient,
     });
 
+    // メトリクスサービス
+    const metricsService = new SkillMetricsService(adminClient);
+
     const executeSkill = async (
       skillKey: string,
       input: Record<string, unknown>
     ) => {
+      // AI Affairsスキルの場合、実データを注入
+      let enrichedInput = { ...input };
+
+      if (skillKey.startsWith('ai-affairs.')) {
+        const now = new Date();
+        const periodDays = (input.period === 'daily' ? 1 :
+                          input.period === 'monthly' ? 30 : 7);
+        const periodStart = new Date(now.getTime() - periodDays * 24 * 60 * 60 * 1000);
+
+        // メトリクスを取得
+        const metrics = await metricsService.getMetrics(
+          user.tenant_id,
+          { start: periodStart, end: now },
+          input.skill_keys as string[] | undefined
+        );
+
+        // サマリーを取得
+        const summary = await metricsService.getSummary(
+          user.tenant_id,
+          { start: periodStart, end: now }
+        );
+
+        // 実データを注入
+        enrichedInput = {
+          ...input,
+          _metrics: {
+            skills: metrics,
+            summary,
+            period: {
+              start: periodStart.toISOString(),
+              end: now.toISOString(),
+              days: periodDays,
+            },
+          },
+        };
+      }
+
       const result = await executor.execute({
         tenant_id: user.tenant_id,
         skill_key: skillKey,
-        input,
+        input: enrichedInput,
         idempotency_key: uuidv4(),
         executor_type: 'agent',
         executor_id: agent.id,
@@ -163,7 +204,7 @@ export async function POST(
       // ExecutionResultからSkillResultを取得
       return {
         output: result.output || {},
-        actual_cost: 0.005, // 固定コスト（実際はDBから取得すべき）
+        actual_cost: result.budget_consumed || 0.005,
         metadata: {},
       };
     };

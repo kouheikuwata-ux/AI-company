@@ -211,6 +211,46 @@ function calculateScore(
 }
 
 /**
+ * 注入されたメトリクスの型
+ */
+interface InjectedMetrics {
+  skills: Array<{
+    skill_key: string;
+    skill_name: string;
+    version: string;
+    usage: {
+      total_executions: number;
+      unique_users: number;
+      unique_agents: number;
+    };
+    performance: {
+      success_rate: number;
+      avg_latency_ms: number;
+      p95_latency_ms: number;
+      error_count: number;
+      timeout_count: number;
+    };
+    cost: {
+      total_cost: number;
+      avg_cost_per_execution: number;
+    };
+    last_used_at: string | null;
+    trend: 'improving' | 'stable' | 'degrading';
+  }>;
+  summary: {
+    total_executions: number;
+    success_rate: number;
+    total_cost: number;
+    avg_latency_ms: number;
+  };
+  period: {
+    start: string;
+    end: string;
+    days: number;
+  };
+}
+
+/**
  * スキル実行ハンドラー
  */
 export const execute: SkillHandler = async (
@@ -229,22 +269,28 @@ export const execute: SkillHandler = async (
     period: parsed.period,
   });
 
+  // 注入されたメトリクスを取得
+  const injectedMetrics = input._metrics as InjectedMetrics | undefined;
   const now = new Date();
   let periodStart: Date;
 
-  switch (parsed.period) {
-    case 'daily':
-      periodStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
-    case 'weekly':
-      periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case 'monthly':
-      periodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
+  if (injectedMetrics?.period) {
+    periodStart = new Date(injectedMetrics.period.start);
+  } else {
+    switch (parsed.period) {
+      case 'daily':
+        periodStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'weekly':
+        periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'monthly':
+        periodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+    }
   }
 
-  // プレースホルダーデータ（実際はDBから取得）
+  // 実データから評価を生成
   const evaluations: Array<{
     skill_key: string;
     skill_name: string;
@@ -277,6 +323,110 @@ export const execute: SkillHandler = async (
       threshold_value: number;
     }>;
   }> = [];
+
+  // 実データがある場合は評価を生成
+  if (injectedMetrics?.skills) {
+    for (const skill of injectedMetrics.skills) {
+      // 最低実行回数チェック
+      if (skill.usage.total_executions < thresholds.min_usage_count) {
+        continue;
+      }
+
+      const issues: Array<{
+        type: 'performance' | 'usage' | 'cost' | 'reliability';
+        severity: 'critical' | 'warning' | 'info';
+        message: string;
+        metric: string;
+        current_value: number;
+        threshold_value: number;
+      }> = [];
+
+      // 成功率チェック
+      if (skill.performance.success_rate < thresholds.min_success_rate) {
+        const severity = skill.performance.success_rate < 0.8 ? 'critical' : 'warning';
+        issues.push({
+          type: 'reliability',
+          severity,
+          message: `成功率が${(skill.performance.success_rate * 100).toFixed(1)}%と目標値を下回っています`,
+          metric: 'success_rate',
+          current_value: skill.performance.success_rate,
+          threshold_value: thresholds.min_success_rate,
+        });
+      }
+
+      // レイテンシチェック
+      if (skill.performance.avg_latency_ms > thresholds.max_avg_latency_ms) {
+        issues.push({
+          type: 'performance',
+          severity: 'warning',
+          message: `平均レイテンシが${skill.performance.avg_latency_ms}msと目標値を超過しています`,
+          metric: 'avg_latency_ms',
+          current_value: skill.performance.avg_latency_ms,
+          threshold_value: thresholds.max_avg_latency_ms,
+        });
+      }
+
+      // エラー/タイムアウトチェック
+      if (skill.performance.error_count > 0 || skill.performance.timeout_count > 0) {
+        const totalFailures = skill.performance.error_count + skill.performance.timeout_count;
+        const failureRate = totalFailures / skill.usage.total_executions;
+        if (failureRate > 0.05) {
+          issues.push({
+            type: 'reliability',
+            severity: failureRate > 0.1 ? 'critical' : 'warning',
+            message: `エラー/タイムアウト率が${(failureRate * 100).toFixed(1)}%です`,
+            metric: 'failure_rate',
+            current_value: failureRate,
+            threshold_value: 0.05,
+          });
+        }
+      }
+
+      // トレンドチェック
+      if (skill.trend === 'degrading') {
+        issues.push({
+          type: 'performance',
+          severity: 'warning',
+          message: 'パフォーマンスが悪化傾向にあります',
+          metric: 'trend',
+          current_value: -1,
+          threshold_value: 0,
+        });
+      }
+
+      // コスト効率計算（仮の計算：低コストほど効率が良い）
+      const avgCostBenchmark = 0.01; // 基準コスト
+      const costEfficiency = Math.min(1, avgCostBenchmark / (skill.cost.avg_cost_per_execution || avgCostBenchmark));
+
+      // スコア計算
+      const score = calculateScore(
+        skill.performance.success_rate,
+        skill.performance.avg_latency_ms,
+        costEfficiency,
+        thresholds.max_avg_latency_ms
+      );
+
+      evaluations.push({
+        skill_key: skill.skill_key,
+        skill_name: skill.skill_name,
+        version: skill.version,
+        usage: {
+          execution_count: skill.usage.total_executions,
+          unique_users: skill.usage.unique_users,
+          unique_agents: skill.usage.unique_agents,
+        },
+        performance: skill.performance,
+        cost: {
+          total_cost: skill.cost.total_cost,
+          avg_cost_per_execution: skill.cost.avg_cost_per_execution,
+          cost_efficiency_score: costEfficiency,
+        },
+        overall_score: score,
+        grade: calculateGrade(score),
+        issues,
+      });
+    }
+  }
 
   // グレード集計
   const byGrade: Record<string, number> = { A: 0, B: 0, C: 0, D: 0, F: 0 };

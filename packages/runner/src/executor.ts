@@ -457,6 +457,7 @@ export class SkillExecutor {
       state: state || execution.state,
       result_status: result ? 'success' : undefined,
       output: result?.output,
+      budget_consumed: result?.actual_cost,
     };
   }
 

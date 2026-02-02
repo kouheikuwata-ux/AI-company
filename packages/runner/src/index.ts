@@ -7,3 +7,4 @@ export * from './budget';
 export * from './audit';
 export * from './errors';
 export * from './pii-guard';
+export * from './metrics';

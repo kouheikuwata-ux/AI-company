@@ -444,6 +444,46 @@ function generateProposals(
 }
 
 /**
+ * 注入されたメトリクスの型
+ */
+interface InjectedMetrics {
+  skills: Array<{
+    skill_key: string;
+    skill_name: string;
+    version: string;
+    usage: {
+      total_executions: number;
+      unique_users: number;
+      unique_agents: number;
+    };
+    performance: {
+      success_rate: number;
+      avg_latency_ms: number;
+      p95_latency_ms: number;
+      error_count: number;
+      timeout_count: number;
+    };
+    cost: {
+      total_cost: number;
+      avg_cost_per_execution: number;
+    };
+    last_used_at: string | null;
+    trend: 'improving' | 'stable' | 'degrading';
+  }>;
+  summary: {
+    total_executions: number;
+    success_rate: number;
+    total_cost: number;
+    avg_latency_ms: number;
+  };
+  period: {
+    start: string;
+    end: string;
+    days: number;
+  };
+}
+
+/**
  * スキル実行ハンドラー
  */
 export const execute: SkillHandler = async (
@@ -462,24 +502,67 @@ export const execute: SkillHandler = async (
     max_proposals: parsed.max_proposals,
   });
 
+  // 注入されたメトリクスを取得
+  const injectedMetrics = input._metrics as InjectedMetrics | undefined;
   const now = new Date();
   let periodStart: Date;
 
-  switch (parsed.analysis_period) {
-    case 'daily':
-      periodStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      break;
-    case 'weekly':
-      periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      break;
-    case 'monthly':
-      periodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-      break;
+  if (injectedMetrics?.period) {
+    periodStart = new Date(injectedMetrics.period.start);
+  } else {
+    switch (parsed.analysis_period) {
+      case 'daily':
+        periodStart = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'weekly':
+        periodStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'monthly':
+        periodStart = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+    }
   }
 
-  // プレースホルダーデータ（実際はDBから取得）
-  // 実運用時はRunner経由でDB集計結果を受け取る
+  // 実データからPerformanceDataを生成
   const skillsData: PerformanceData[] = [];
+
+  if (injectedMetrics?.skills) {
+    const avgCostBenchmark = 0.01; // 基準コスト
+
+    for (const skill of injectedMetrics.skills) {
+      // 対象スキルフィルタ
+      if (parsed.target_skills && parsed.target_skills.length > 0) {
+        if (!parsed.target_skills.includes(skill.skill_key)) {
+          continue;
+        }
+      }
+
+      // 最低実行回数がなければスキップ
+      if (skill.usage.total_executions < 1) {
+        continue;
+      }
+
+      // コスト効率計算
+      const costEfficiency = Math.min(
+        1,
+        avgCostBenchmark / (skill.cost.avg_cost_per_execution || avgCostBenchmark)
+      );
+
+      skillsData.push({
+        skill_key: skill.skill_key,
+        skill_name: skill.skill_name,
+        success_rate: skill.performance.success_rate,
+        avg_latency_ms: skill.performance.avg_latency_ms,
+        p95_latency_ms: skill.performance.p95_latency_ms,
+        error_count: skill.performance.error_count,
+        timeout_count: skill.performance.timeout_count,
+        total_executions: skill.usage.total_executions,
+        avg_cost: skill.cost.avg_cost_per_execution,
+        cost_efficiency: costEfficiency,
+        trend: skill.trend,
+      });
+    }
+  }
 
   // 提案を生成
   const allProposals: Array<{

@@ -241,6 +241,9 @@ export interface ExecutionResult {
 
   /** エラーメッセージ（失敗時） */
   error_message?: string;
+
+  /** 消費した予算 */
+  budget_consumed?: number;
 }
 
 /**
