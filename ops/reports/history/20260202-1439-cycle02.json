@@ -1,0 +1,52 @@
+{
+  "cycle": 2,
+  "timestamp": "2026-02-02T14:39:00.000Z",
+  "theme": {
+    "title": "deprecation_check 環境変数未設定時を「スキップ」扱いに変更",
+    "classification": "E",
+    "classification_name": "DX/可視化",
+    "selection_reason": "環境変数未設定は「コードの問題」ではなく「設定の問題」。失敗として報告すると常にWARNING状態になり本当の問題が埋もれる。スキップとして扱うことで誤報を減らし監査の質を上げる。"
+  },
+  "changes": {
+    "commits": [
+      "21089b6: fix: Handle missing env vars as skipped instead of failed"
+    ],
+    "files_modified": 2,
+    "key_changes": [
+      "DeprecationCheckResult に skipped, skip_reason フラグ追加",
+      "環境変数未設定時は success=true, skipped=true を返す",
+      "summarize.ts でスキップを INFO として表示",
+      "P1 issues からスキップを除外"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "overall_health": "WARNING",
+      "p1_issues": 1,
+      "false_positive": true
+    },
+    "after": {
+      "overall_health": "HEALTHY",
+      "p1_issues": 0,
+      "skipped_checks_shown": true
+    }
+  },
+  "result": "improved",
+  "next_candidates": [
+    {
+      "priority": "P2",
+      "theme": "サイクルログ自動記録機構の追加",
+      "reason": "現在手動で history に記録しているが、自動化すべき"
+    },
+    {
+      "priority": "P3",
+      "theme": "ops:check の実行時間最適化",
+      "reason": "self_check が 954ms かかっている"
+    },
+    {
+      "priority": "P2",
+      "theme": "Company OS 設計図の可視化",
+      "reason": "エージェント・スキル・責務の関係を可視化"
+    }
+  ]
+}

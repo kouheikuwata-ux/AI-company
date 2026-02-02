@@ -63,7 +63,7 @@ AI Company OSでは、**エージェント**が会社の役職を担い、**ス�
 
 ## スキル一覧
 
-### 実装済み (6スキル)
+### 実装済み (13スキル)
 
 | Key | 名前 | カテゴリ | 責任レベル |
 |-----|------|---------|-----------|
@@ -71,18 +71,15 @@ AI Company OSでは、**エージェント**が会社の役職を担い、**ス�
 | `governance.decision-brief` | 意思決定ブリーフ | governance | HUMAN_DIRECT |
 | `governance.budget-insight` | 予算インサイト | governance | HUMAN_APPROVED |
 | `operations.daily-standup` | 朝会レポート | operations | AI_WITH_REVIEW |
+| `operations.weekly-review` | 週次オペレーションレビュー | operations | AI_WITH_REVIEW |
 | `engineering.system-health` | システム健全性 | engineering | AI_INTERNAL_ONLY |
+| `finance.cost-analysis` | コスト分析レポート | finance | AI_WITH_REVIEW |
+| `audit.compliance-check` | コンプライアンスチェック | audit | AI_WITH_REVIEW |
+| `ai-affairs.skill-evaluation` | スキル評価 | ai-affairs | HUMAN_APPROVED |
+| `ai-affairs.skill-deprecation-check` | スキル廃止チェック | ai-affairs | AI_WITH_REVIEW |
+| `ai-affairs.request-intake` | スキル追加リクエスト | ai-affairs | HUMAN_APPROVED |
+| `ai-affairs.performance-improvement` | パフォーマンス改善提案 | ai-affairs | AI_WITH_REVIEW |
 | `internal.summary.create` | テキスト要約 | internal | AI_INTERNAL_ONLY |
-
-### 計画中スキル
-
-| Key | 名前 | 担当Agent | 優先度 |
-|-----|------|-----------|--------|
-| `operations.weekly-review` | 週次レビュー | COO | 高 |
-| `finance.cost-analysis` | コスト分析 | CFO | 高 |
-| `ai-affairs.skill-evaluation` | スキル評価 | HR Manager | 高 |
-| `engineering.improvement-proposal` | 改善提案 | CTO | 中 |
-| `audit.compliance-check` | コンプライアンスチェック | Auditor | 中 |
 
 ## 責任レベル
 

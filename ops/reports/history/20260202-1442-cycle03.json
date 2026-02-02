@@ -1,0 +1,60 @@
+{
+  "cycle": 3,
+  "timestamp": "2026-02-02T14:42:00.000Z",
+  "theme": {
+    "title": "operations.weekly-review スキルの実装",
+    "classification": "C",
+    "classification_name": "スキル構造",
+    "selection_reason": "設計図(docs/agents-and-skills.md)に「高優先度」と明記されている計画中スキル。COO Agentの週次責務として定義済み。定期タスクに「金曜16時」として登録済み。"
+  },
+  "changes": {
+    "commits": [
+      "c038830: feat: Add operations.weekly-review skill"
+    ],
+    "files_created": [
+      "packages/skills/src/operations/weekly-review.skill.ts"
+    ],
+    "key_features": [
+      "週次サマリー（実行数、成功率、コスト）",
+      "前週比較（トレンド分析）",
+      "トップパフォーマンススキル",
+      "要注意事項",
+      "来週への提案"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "total_skills": 10,
+      "weekly_review_implemented": false
+    },
+    "after": {
+      "total_skills": 11,
+      "weekly_review_implemented": true
+    }
+  },
+  "result": "improved",
+  "design_doc_alignment": {
+    "planned_skills_remaining": [
+      "finance.cost-analysis (高優先度)",
+      "audit.compliance-check (中優先度)"
+    ],
+    "implemented_this_cycle": "operations.weekly-review"
+  },
+  "next_candidates": [
+    {
+      "priority": "P2",
+      "theme": "finance.cost-analysis スキルの実装",
+      "reason": "設計図で「高優先度」として記載。CFO Agent用。"
+    },
+    {
+      "priority": "P2",
+      "theme": "audit.compliance-check スキルの実装",
+      "reason": "設計図で「中優先度」として記載。Auditor Agent用。"
+    },
+    {
+      "priority": "P3",
+      "theme": "設計図のドキュメント更新",
+      "reason": "実装済みスキルと計画中スキルの整合性を取る"
+    }
+  ]
+}

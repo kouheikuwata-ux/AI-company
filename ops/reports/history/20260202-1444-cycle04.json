@@ -1,0 +1,60 @@
+{
+  "cycle": 4,
+  "timestamp": "2026-02-02T14:44:00.000Z",
+  "theme": {
+    "title": "finance.cost-analysis スキルの実装",
+    "classification": "C",
+    "classification_name": "スキル構造",
+    "selection_reason": "設計図(docs/agents-and-skills.md)に「高優先度」として記載。CFO Agentの週次コストレポート用。"
+  },
+  "changes": {
+    "commits": [
+      "040e458: feat: Add finance.cost-analysis skill"
+    ],
+    "files_created": [
+      "packages/skills/src/finance/cost-analysis.skill.ts"
+    ],
+    "key_features": [
+      "コストサマリー（総コスト、平均コスト、予算消化率）",
+      "カテゴリ別内訳",
+      "トップコストスキル分析",
+      "異常検知",
+      "最適化提案",
+      "エグゼクティブサマリー"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "total_skills": 11,
+      "cost_analysis_implemented": false
+    },
+    "after": {
+      "total_skills": 12,
+      "cost_analysis_implemented": true
+    }
+  },
+  "result": "improved",
+  "design_doc_alignment": {
+    "planned_skills_remaining": [
+      "audit.compliance-check (中優先度)"
+    ],
+    "implemented_this_cycle": "finance.cost-analysis"
+  },
+  "next_candidates": [
+    {
+      "priority": "P2",
+      "theme": "audit.compliance-check スキルの実装",
+      "reason": "設計図で「中優先度」として記載。Auditor Agent用。"
+    },
+    {
+      "priority": "P3",
+      "theme": "設計図ドキュメントの更新",
+      "reason": "実装済みスキルリストと計画中スキルの整合性"
+    },
+    {
+      "priority": "P2",
+      "theme": "history ファイルの定期コミット自動化",
+      "reason": "サイクルログが蓄積しており、コミット管理が必要"
+    }
+  ]
+}
