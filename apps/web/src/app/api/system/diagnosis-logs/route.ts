@@ -1,29 +1,55 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAdminUser } from '@/lib/auth/helpers';
+import {
+  DiagnosisLogsQuerySchema,
+  DiagnosisLogDetailSchema,
+  searchParamsToRecord,
+} from '@/lib/validation/api-schemas';
+import { ZodError } from 'zod';
+
+/**
+ * Zod エラーをフォーマット
+ */
+function formatZodError(error: ZodError): string {
+  return error.errors.map((e) => `${e.path.join('.')}: ${e.message}`).join(', ');
+}
 
 /**
  * システム自己診断ログ取得API
  *
  * GET /api/system/diagnosis-logs
  *
+ * 認証: 必須（admin または owner ロールのユーザーのみ）
+ *
  * Query Parameters:
  *   - limit: 取得件数（デフォルト: 10, 最大: 100）
  *   - offset: オフセット（デフォルト: 0）
  *   - trigger_type: フィルタ（cron / ci / manual）
- *
- * Note: service_role でアクセス（RLSバイパス）
  */
 export async function GET(request: NextRequest) {
   try {
-    const searchParams = request.nextUrl.searchParams;
+    // 認証・権限チェック
+    const user = await getAdminUser();
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Admin or owner role required' },
+        { status: 403 }
+      );
+    }
 
-    // パラメータ解析
-    const limit = Math.min(
-      Math.max(1, parseInt(searchParams.get('limit') || '10', 10)),
-      100
-    );
-    const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10));
-    const triggerType = searchParams.get('trigger_type');
+    // パラメータバリデーション
+    const rawParams = searchParamsToRecord(request.nextUrl.searchParams);
+    const parseResult = DiagnosisLogsQuerySchema.safeParse(rawParams);
+
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid parameters', detail: formatZodError(parseResult.error) },
+        { status: 400 }
+      );
+    }
+
+    const { limit, offset, trigger_type: triggerType } = parseResult.data;
 
     // Supabase Admin Client（service_role でRLSバイパス）
     const supabase = createAdminClient();
@@ -48,7 +74,7 @@ export async function GET(request: NextRequest) {
       .range(offset, offset + limit - 1);
 
     // trigger_type フィルタ
-    if (triggerType && ['cron', 'ci', 'manual'].includes(triggerType)) {
+    if (triggerType) {
       query = query.eq('trigger_type', triggerType);
     }
 
@@ -83,19 +109,34 @@ export async function GET(request: NextRequest) {
 /**
  * 特定ログの詳細取得（full_report含む）
  *
- * GET /api/system/diagnosis-logs?id=<uuid>
+ * POST /api/system/diagnosis-logs
+ * Body: { id: string (UUID) }
+ *
+ * 認証: 必須（admin または owner ロールのユーザーのみ）
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { id } = body;
-
-    if (!id) {
+    // 認証・権限チェック
+    const user = await getAdminUser();
+    if (!user) {
       return NextResponse.json(
-        { error: 'Missing required field: id' },
+        { error: 'Admin or owner role required' },
+        { status: 403 }
+      );
+    }
+
+    // ボディバリデーション
+    const body = await request.json();
+    const parseResult = DiagnosisLogDetailSchema.safeParse(body);
+
+    if (!parseResult.success) {
+      return NextResponse.json(
+        { error: 'Invalid request body', detail: formatZodError(parseResult.error) },
         { status: 400 }
       );
     }
+
+    const { id } = parseResult.data;
 
     const supabase = createAdminClient();
 

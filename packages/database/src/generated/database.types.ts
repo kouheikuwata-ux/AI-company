@@ -475,6 +475,41 @@ export interface Database {
           created_at?: string
         }
       }
+      system_self_diagnosis_logs: {
+        Row: {
+          id: string
+          created_at: string
+          trigger_type: 'cron' | 'ci' | 'manual'
+          system_version: string
+          issues_total: number
+          issues_auto_fixed: number
+          issues_pending_approval: number
+          summary: Json
+          full_report: Json
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          trigger_type: 'cron' | 'ci' | 'manual'
+          system_version: string
+          issues_total?: number
+          issues_auto_fixed?: number
+          issues_pending_approval?: number
+          summary?: Json
+          full_report?: Json
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          trigger_type?: 'cron' | 'ci' | 'manual'
+          system_version?: string
+          issues_total?: number
+          issues_auto_fixed?: number
+          issues_pending_approval?: number
+          summary?: Json
+          full_report?: Json
+        }
+      }
     }
     Functions: {
       get_current_tenant_id: {
@@ -494,6 +529,7 @@ export interface Database {
       approval_status: 'pending' | 'approved' | 'rejected' | 'expired'
       budget_transaction_type: 'reserve' | 'consume' | 'release' | 'adjust'
       user_role: 'owner' | 'admin' | 'member'
+      diagnosis_trigger_type: 'cron' | 'ci' | 'manual'
     }
   }
 }

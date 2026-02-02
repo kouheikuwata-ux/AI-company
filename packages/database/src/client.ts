@@ -48,8 +48,12 @@ export async function setTenantContext(
   client: TypedSupabaseClient,
   tenantId: string
 ): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { error } = await (client as any).rpc('set_tenant_context', {
+  // Supabase JS v2 の rpc 型推論の制限により型キャストが必要
+  // Database型のFunctions定義とSupabaseクライアントの型推論に互換性の問題があるため
+  const rpcClient = client as unknown as {
+    rpc: (fn: string, params: Record<string, string>) => Promise<{ error: Error | null }>;
+  };
+  const { error } = await rpcClient.rpc('set_tenant_context', {
     p_tenant_id: tenantId,
   });
 

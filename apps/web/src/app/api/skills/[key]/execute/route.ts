@@ -79,13 +79,13 @@ export async function POST(
     }
 
     // ユーザー情報取得（tenant_id含む）
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: userData } = await (supabase as any)
+    const { data: userData } = await supabase
       .from('users')
       .select('id, tenant_id')
       .eq('id', session.user.id)
       .single();
 
+    // Supabaseの型推論制限のため、型アサーションを使用
     const user = userData as { id: string; tenant_id: string } | null;
 
     if (!user) {

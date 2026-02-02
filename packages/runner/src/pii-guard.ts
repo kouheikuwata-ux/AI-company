@@ -11,7 +11,7 @@ export class PIIGuard {
   /**
    * LLMに渡す前のPIIチェック
    */
-  validateForLLM(policy: PIIPolicy, input: unknown): void {
+  validateForLLM(policy: PIIPolicy, _input: unknown): void {
     if (policy.input_contains_pii) {
       switch (policy.handling) {
         case 'REJECT':

@@ -1,8 +1,15 @@
 import { initializeRegistry } from '@ai-company-os/skills';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { getAuthenticatedUser } from '@/lib/auth/helpers';
 
 // 動的レンダリング強制（最新ログを必ず反映）
 export const dynamic = 'force-dynamic';
+
+/** 7日間（ミリ秒） */
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** デフォルト予算限度額 */
+const DEFAULT_BUDGET_LIMIT = 100;
 
 // Build-time Registry（サーバーコンポーネントで直接参照）
 const registry = initializeRegistry();
@@ -20,6 +27,139 @@ interface DiagnosisLog {
 type FetchResult =
   | { success: true; logs: DiagnosisLog[] }
   | { success: false; error: string };
+
+interface ExecutionMetrics {
+  runningCount: number;
+  pendingApprovalCount: number;
+}
+
+interface BudgetMetrics {
+  usedAmount: number;
+  limitAmount: number;
+}
+
+interface RecentExecution {
+  id: string;
+  skill_key: string;
+  state: string;
+  created_at: string;
+  result_status: string | null;
+}
+
+interface PendingApproval {
+  id: string;
+  skill_key: string;
+  created_at: string;
+  executor_type: string;
+}
+
+/**
+ * 実行メトリクス取得（実行中・承認待ち）
+ */
+async function fetchExecutionMetrics(): Promise<ExecutionMetrics> {
+  try {
+    const supabase = createAdminClient();
+
+    // 実行中のスキル数
+    const { count: runningCount } = await supabase
+      .from('skill_executions')
+      .select('*', { count: 'exact', head: true })
+      .eq('state', 'RUNNING');
+
+    // 承認待ちのスキル数
+    const { count: pendingCount } = await supabase
+      .from('skill_executions')
+      .select('*', { count: 'exact', head: true })
+      .eq('state', 'PENDING_APPROVAL');
+
+    return {
+      runningCount: runningCount || 0,
+      pendingApprovalCount: pendingCount || 0,
+    };
+  } catch (err) {
+    console.error('[Dashboard] Failed to fetch execution metrics:', err);
+    return { runningCount: 0, pendingApprovalCount: 0 };
+  }
+}
+
+/**
+ * 今月の予算取得
+ */
+async function fetchBudgetMetrics(): Promise<BudgetMetrics> {
+  try {
+    const supabase = createAdminClient();
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+
+    // テナントレベルの予算を取得（アクティブで今月のもの）
+    const { data } = await supabase
+      .from('budgets')
+      .select('used_amount, reserved_amount, limit_amount')
+      .eq('scope_type', 'tenant')
+      .eq('is_active', true)
+      .gte('period_end', startOfMonth)
+      .lte('period_start', endOfMonth)
+      .limit(1)
+      .single();
+
+    // Supabaseの型推論制限のため、型アサーションを使用
+    const budgetData = data as { used_amount: number; reserved_amount: number; limit_amount: number } | null;
+
+    if (budgetData) {
+      return {
+        usedAmount: (budgetData.used_amount || 0) + (budgetData.reserved_amount || 0),
+        limitAmount: budgetData.limit_amount ?? DEFAULT_BUDGET_LIMIT,
+      };
+    }
+
+    return { usedAmount: 0, limitAmount: DEFAULT_BUDGET_LIMIT };
+  } catch (err) {
+    console.error('[Dashboard] Failed to fetch budget metrics:', err);
+    return { usedAmount: 0, limitAmount: DEFAULT_BUDGET_LIMIT };
+  }
+}
+
+/**
+ * 最近の実行履歴取得
+ */
+async function fetchRecentExecutions(): Promise<RecentExecution[]> {
+  try {
+    const supabase = createAdminClient();
+
+    const { data } = await supabase
+      .from('skill_executions')
+      .select('id, skill_key, state, created_at, result_status')
+      .order('created_at', { ascending: false })
+      .limit(5);
+
+    return (data as RecentExecution[]) || [];
+  } catch (err) {
+    console.error('[Dashboard] Failed to fetch recent executions:', err);
+    return [];
+  }
+}
+
+/**
+ * 承認キュー取得
+ */
+async function fetchPendingApprovals(): Promise<PendingApproval[]> {
+  try {
+    const supabase = createAdminClient();
+
+    const { data } = await supabase
+      .from('skill_executions')
+      .select('id, skill_key, created_at, executor_type')
+      .eq('state', 'PENDING_APPROVAL')
+      .order('created_at', { ascending: true })
+      .limit(5);
+
+    return (data as PendingApproval[]) || [];
+  } catch (err) {
+    console.error('[Dashboard] Failed to fetch pending approvals:', err);
+    return [];
+  }
+}
 
 /**
  * 診断ログをDB直読で取得（service_role でRLSバイパス）
@@ -55,7 +195,7 @@ function calculateHealthMetrics(logs: DiagnosisLog[]) {
   }
 
   const now = new Date();
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const sevenDaysAgo = new Date(now.getTime() - SEVEN_DAYS_MS);
 
   // 最終チェック日時
   const latestCheckAt = logs[0].created_at;
@@ -95,24 +235,60 @@ function formatDateTime(isoString: string): string {
 }
 
 export default async function DashboardPage() {
+  // 認証チェック
+  const user = await getAuthenticatedUser();
+
+  if (!user) {
+    return (
+      <div className="min-h-screen p-8 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">認証が必要です</h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-6">
+            ダッシュボードにアクセスするにはログインが必要です。
+          </p>
+          <a
+            href="/login"
+            className="inline-block px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            ログインページへ
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   // スキル統計（internalを除外した公開スキル数）
   const allSkills = registry.list();
   const publicSkillCount = allSkills.filter((s) => s.category !== 'internal').length;
   const totalSkillCount = allSkills.length;
 
-  // 診断ログ取得（DB直読）
-  const result = await fetchDiagnosisLogsFromDB();
+  // 並列でDBデータ取得
+  const [result, executionMetrics, budgetMetrics, recentExecutions, pendingApprovals] =
+    await Promise.all([
+      fetchDiagnosisLogsFromDB(),
+      fetchExecutionMetrics(),
+      fetchBudgetMetrics(),
+      fetchRecentExecutions(),
+      fetchPendingApprovals(),
+    ]);
+
   const fetchFailed = !result.success;
   const logs = result.success ? result.logs : [];
   const healthMetrics = calculateHealthMetrics(logs);
 
   return (
     <div className="min-h-screen p-8">
-      <header className="mb-8">
-        <h1 className="text-2xl font-bold">ダッシュボード</h1>
-        <p className="text-gray-600 dark:text-gray-400">
-          AI Company OS 管理画面
-        </p>
+      <header className="mb-8 flex justify-between items-start">
+        <div>
+          <h1 className="text-2xl font-bold">ダッシュボード</h1>
+          <p className="text-gray-600 dark:text-gray-400">
+            AI Company OS 管理画面
+          </p>
+        </div>
+        <div className="text-right text-sm">
+          <p className="font-medium">{user.display_name || user.email}</p>
+          <p className="text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
+        </div>
       </header>
 
       {/* AI Health Section */}
@@ -154,22 +330,22 @@ export default async function DashboardPage() {
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
             実行中
           </h3>
-          <p className="text-3xl font-bold">0</p>
+          <p className="text-3xl font-bold">{executionMetrics.runningCount}</p>
         </div>
 
         <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
             承認待ち
           </h3>
-          <p className="text-3xl font-bold">0</p>
+          <p className="text-3xl font-bold">{executionMetrics.pendingApprovalCount}</p>
         </div>
 
         <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow">
           <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400">
             今月の予算
           </h3>
-          <p className="text-3xl font-bold">$0.00</p>
-          <p className="text-sm text-gray-500">/ $100.00</p>
+          <p className="text-3xl font-bold">${budgetMetrics.usedAmount.toFixed(2)}</p>
+          <p className="text-sm text-gray-500">/ ${budgetMetrics.limitAmount.toFixed(2)}</p>
         </div>
 
         <div className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow">
@@ -184,16 +360,68 @@ export default async function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <section className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4">最近の実行</h2>
-          <p className="text-gray-500 dark:text-gray-400">
-            実行履歴がありません
-          </p>
+          {recentExecutions.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">
+              実行履歴がありません
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {recentExecutions.map((exec) => (
+                <li
+                  key={exec.id}
+                  className="flex items-center justify-between p-2 border border-gray-200 dark:border-gray-700 rounded"
+                >
+                  <div>
+                    <span className="font-medium">{exec.skill_key}</span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      {formatDateTime(exec.created_at)}
+                    </span>
+                  </div>
+                  <span
+                    className={`text-xs px-2 py-1 rounded ${
+                      exec.state === 'COMPLETED'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                        : exec.state === 'FAILED'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : exec.state === 'RUNNING'
+                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                    }`}
+                  >
+                    {exec.state}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
 
         <section className="p-6 bg-white dark:bg-slate-800 rounded-lg shadow">
           <h2 className="text-lg font-semibold mb-4">承認キュー</h2>
-          <p className="text-gray-500 dark:text-gray-400">
-            承認待ちの実行はありません
-          </p>
+          {pendingApprovals.length === 0 ? (
+            <p className="text-gray-500 dark:text-gray-400">
+              承認待ちの実行はありません
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {pendingApprovals.map((approval) => (
+                <li
+                  key={approval.id}
+                  className="flex items-center justify-between p-2 border border-yellow-200 dark:border-yellow-700 rounded bg-yellow-50 dark:bg-yellow-900/20"
+                >
+                  <div>
+                    <span className="font-medium">{approval.skill_key}</span>
+                    <span className="ml-2 text-xs text-gray-500">
+                      {formatDateTime(approval.created_at)}
+                    </span>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                    {approval.executor_type}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       </div>
     </div>

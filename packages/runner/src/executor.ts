@@ -10,7 +10,7 @@ import type {
   SkillLogger,
   LLMClient,
 } from '@ai-company-os/skill-spec';
-import { ResponsibilityLevel, isResponsibilityLevelSufficient } from '@ai-company-os/skill-spec';
+import { ResponsibilityLevel } from '@ai-company-os/skill-spec';
 import { StateMachine, type Execution } from './state-machine';
 import { BudgetService, type BudgetReservation } from './budget';
 import { AuditLogger } from './audit';
@@ -413,10 +413,12 @@ export class SkillExecutor {
   private createLogger(executionId: string): SkillLogger {
     const prefix = `[Execution:${executionId}]`;
     return {
+      /* eslint-disable no-console */
       debug: (msg, data) => console.debug(prefix, msg, data),
       info: (msg, data) => console.info(prefix, msg, data),
       warn: (msg, data) => console.warn(prefix, msg, data),
       error: (msg, data) => console.error(prefix, msg, data),
+      /* eslint-enable no-console */
     };
   }
 }

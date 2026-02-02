@@ -1,0 +1,11 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "cd ../.. && pnpm install",
+  "buildCommand": "cd ../.. && pnpm run build",
+  "crons": [
+    {
+      "path": "/api/system/self-check/run",
+      "schedule": "0 21 * * *"
+    }
+  ]
+}
