@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { inngest } from '@/lib/inngest/client';
 import { initializeRegistry } from '@ai-company-os/skills';
 
@@ -65,24 +66,26 @@ export async function POST(
       );
     }
 
-    // 1. 認証
+    // 1. 認証（getUser() でトークン検証）
     const supabase = createServerSupabaseClient();
     const {
-      data: { session },
-    } = await supabase.auth.getSession();
+      data: { user: authUser },
+      error: authError,
+    } = await supabase.auth.getUser();
 
-    if (!session) {
+    if (authError || !authUser) {
       return NextResponse.json(
         { error: { code: 'UNAUTHORIZED', message: 'Authentication required' } },
         { status: 401 }
       );
     }
 
-    // ユーザー情報取得（tenant_id含む）
-    const { data: userData } = await supabase
+    // ユーザー情報取得（tenant_id含む）- RLSバイパスのためadminクライアント使用
+    const adminClient = createAdminClient();
+    const { data: userData } = await adminClient
       .from('users')
       .select('id, tenant_id')
-      .eq('id', session.user.id)
+      .eq('id', authUser.id)
       .single();
 
     // Supabaseの型推論制限のため、型アサーションを使用
@@ -124,8 +127,8 @@ export async function POST(
 
         // 責任モデル
         executor_type: 'user',
-        executor_id: session.user.id,
-        legal_responsible_user_id: session.user.id,
+        executor_id: authUser.id,
+        legal_responsible_user_id: authUser.id,
         responsibility_level: 1, // HUMAN_APPROVED
 
         // コンテキスト

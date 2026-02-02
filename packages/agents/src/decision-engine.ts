@@ -236,6 +236,158 @@ const SKILL_RULES: Record<string, DecisionRule[]> = {
       severity: 'warning',
     },
   ],
+
+  // リクエスト受付のルール
+  'ai-affairs.request-intake': [
+    {
+      name: 'critical-requests-pending',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        const byPriority = summary?.by_priority as Record<string, number> | undefined;
+        return (byPriority?.critical as number) > 0;
+      },
+      actions: [
+        {
+          type: 'escalate',
+          target: 'coo',
+          message: '緊急のスキルリクエストがあります。確認が必要です。',
+          priority: 'high',
+        },
+      ],
+      analysis: '緊急（critical）のスキルリクエストが存在します。',
+      reasoning: 'critical優先度のリクエストがあるため、COOへエスカレーション',
+      severity: 'warning',
+    },
+    {
+      name: 'many-pending-requests',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        return (summary?.new_requests as number) > 10;
+      },
+      actions: [
+        {
+          type: 'notify',
+          message: '未処理のリクエストが10件を超えています。',
+          priority: 'medium',
+        },
+      ],
+      analysis: '未処理のリクエストが多数蓄積しています。',
+      reasoning: '未処理リクエスト > 10件のため、通知',
+      severity: 'warning',
+    },
+    {
+      name: 'requests-processed',
+      condition: () => true,
+      actions: [],
+      analysis: 'リクエスト受付処理が完了しました。',
+      reasoning: 'リクエスト受付完了',
+      severity: 'info',
+    },
+  ],
+
+  // スキル評価のルール
+  'ai-affairs.skill-evaluation': [
+    {
+      name: 'critical-issues-found',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        return (summary?.critical_issues_count as number) > 0;
+      },
+      actions: [
+        {
+          type: 'escalate',
+          target: 'cto',
+          message: 'スキルに重大な問題が検出されました。',
+          priority: 'high',
+        },
+        {
+          type: 'execute_skill',
+          skillKey: 'ai-affairs.skill-deprecation-check',
+          input: { inactivity_threshold_days: 30 },
+          message: '問題のあるスキルの廃止チェックを実行',
+          priority: 'high',
+        },
+      ],
+      analysis: 'スキル評価で重大な問題が検出されました。',
+      reasoning: 'critical_issues_count > 0 のため、CTOへエスカレーション',
+      severity: 'critical',
+    },
+    {
+      name: 'low-grade-skills',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        const byGrade = summary?.by_grade as Record<string, number> | undefined;
+        return ((byGrade?.D as number) || 0) + ((byGrade?.F as number) || 0) > 0;
+      },
+      actions: [
+        {
+          type: 'notify',
+          message: '低評価（D/F）のスキルがあります。改善を検討してください。',
+          priority: 'medium',
+        },
+      ],
+      analysis: '低評価のスキルが存在します。',
+      reasoning: 'D/Fグレードのスキルがあるため、通知',
+      severity: 'warning',
+    },
+    {
+      name: 'evaluation-complete',
+      condition: () => true,
+      actions: [],
+      analysis: 'スキル評価が正常に完了しました。',
+      reasoning: 'スキル評価完了',
+      severity: 'info',
+    },
+  ],
+
+  // スキル廃止チェックのルール
+  'ai-affairs.skill-deprecation-check': [
+    {
+      name: 'deprecation-candidates-found',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        return (summary?.deprecation_candidates as number) > 0;
+      },
+      actions: [
+        {
+          type: 'escalate',
+          target: 'coo',
+          message: '廃止候補のスキルが検出されました。レビューが必要です。',
+          priority: 'medium',
+        },
+      ],
+      analysis: '廃止候補のスキルが検出されました。人間によるレビューが必要です。',
+      reasoning: 'deprecation_candidates > 0 のため、COOへエスカレーション',
+      severity: 'warning',
+    },
+    {
+      name: 'high-impact-deprecation',
+      condition: (output) => {
+        const summary = output.summary as Record<string, unknown> | undefined;
+        const byImpact = summary?.by_impact as Record<string, number> | undefined;
+        return (byImpact?.high as number) > 0;
+      },
+      actions: [
+        {
+          type: 'escalate',
+          target: 'ceo',
+          message: '影響度の高い廃止候補が検出されました。',
+          priority: 'high',
+        },
+      ],
+      analysis: '影響度の高い廃止候補が存在します。慎重な判断が必要です。',
+      reasoning: 'high impact candidates > 0 のため、CEOへエスカレーション',
+      severity: 'critical',
+    },
+    {
+      name: 'no-deprecation-needed',
+      condition: () => true,
+      actions: [],
+      analysis: '廃止が必要なスキルはありませんでした。',
+      reasoning: '廃止候補なし',
+      severity: 'info',
+    },
+  ],
 };
 
 /**

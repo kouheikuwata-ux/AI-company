@@ -3,14 +3,18 @@
 -- システム自己診断結果の永続化
 -- ============================================================
 
--- トリガータイプ
-CREATE TYPE diagnosis_trigger_type AS ENUM ('cron', 'ci', 'manual');
+-- トリガータイプ（存在しない場合のみ作成）
+DO $$ BEGIN
+  CREATE TYPE diagnosis_trigger_type AS ENUM ('cron', 'ci', 'manual');
+EXCEPTION
+  WHEN duplicate_object THEN null;
+END $$;
 
 -- ============================================================
 -- System Self-Diagnosis Logs Table
 -- ============================================================
 
-CREATE TABLE system_self_diagnosis_logs (
+CREATE TABLE IF NOT EXISTS system_self_diagnosis_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
@@ -29,9 +33,9 @@ CREATE TABLE system_self_diagnosis_logs (
 );
 
 -- インデックス
-CREATE INDEX idx_diagnosis_created ON system_self_diagnosis_logs(created_at DESC);
-CREATE INDEX idx_diagnosis_trigger ON system_self_diagnosis_logs(trigger_type);
-CREATE INDEX idx_diagnosis_issues ON system_self_diagnosis_logs(issues_total) WHERE issues_total > 0;
+CREATE INDEX IF NOT EXISTS idx_diagnosis_created ON system_self_diagnosis_logs(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_trigger ON system_self_diagnosis_logs(trigger_type);
+CREATE INDEX IF NOT EXISTS idx_diagnosis_issues ON system_self_diagnosis_logs(issues_total) WHERE issues_total > 0;
 
 -- コメント
 COMMENT ON TABLE system_self_diagnosis_logs IS 'システム自己診断の実行結果を記録';

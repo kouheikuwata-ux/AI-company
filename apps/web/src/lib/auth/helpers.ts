@@ -1,4 +1,5 @@
 import { createServerSupabaseClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export interface AuthenticatedUser {
   id: string;
@@ -15,21 +16,39 @@ export interface AuthenticatedUser {
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser | null> {
   try {
     const supabase = createServerSupabaseClient();
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
 
-    if (!session) {
+    // getUser() を使用してトークンを検証（getSession() は検証しない）
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error || !user) {
       return null;
     }
 
-    const { data: userData } = await supabase
+    // usersテーブルからユーザー情報を取得（RLSバイパスのためadminクライアント使用）
+    const adminClient = createAdminClient();
+    const { data: userData } = await adminClient
       .from('users')
       .select('id, email, role, display_name, tenant_id')
-      .eq('id', session.user.id)
+      .eq('id', user.id)
       .single();
 
-    return userData as AuthenticatedUser | null;
+    // usersテーブルにレコードがある場合はそれを返す
+    if (userData) {
+      return userData as AuthenticatedUser;
+    }
+
+    // usersテーブルにレコードがない場合は、Supabase Authの情報から基本的なユーザー情報を返す
+    // これにより、usersテーブルへの登録が完了していなくてもダッシュボードにアクセス可能
+    return {
+      id: user.id,
+      email: user.email || '',
+      role: 'member',
+      display_name: user.user_metadata?.display_name || null,
+      tenant_id: 'default',
+    };
   } catch {
     return null;
   }

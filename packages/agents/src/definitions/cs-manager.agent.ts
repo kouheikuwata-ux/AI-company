@@ -15,7 +15,7 @@ import { AgentRole, Department, AgentCapability, AgentStatus } from '../types';
 
 export const csManagerAgent: AgentSpec = {
   id: 'a0000001-0000-0000-0000-000000000006',
-  key: 'cs_manager',
+  key: 'cs-manager',
   name: 'CS Manager Agent',
   description: '顧客フィードバックと利用分析を担当。顧客対応決定は人間が行う。',
 

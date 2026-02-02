@@ -16,7 +16,7 @@ import { AgentRole, Department, AgentCapability, AgentStatus } from '../types';
 
 export const hrManagerAgent: AgentSpec = {
   id: 'a0000001-0000-0000-0000-000000000005',
-  key: 'hr_manager',
+  key: 'hr-manager',
   name: 'HR Manager Agent (AI Affairs)',
   description: 'スキルのライフサイクル管理を担当。スキル = 会社の能力資産。',
 

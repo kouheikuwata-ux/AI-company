@@ -36,17 +36,17 @@ export const organizationChart = {
   },
   coo: {
     agent: cooAgent,
-    reports: ['hr_manager', 'cs_manager'],
+    reports: ['hr-manager', 'cs-manager'],
   },
   cto: {
     agent: ctoAgent,
     reports: ['auditor'],
   },
-  hr_manager: {
+  'hr-manager': {
     agent: hrManagerAgent,
     reports: [],
   },
-  cs_manager: {
+  'cs-manager': {
     agent: csManagerAgent,
     reports: [],
   },

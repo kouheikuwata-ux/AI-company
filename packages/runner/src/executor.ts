@@ -125,6 +125,7 @@ export class SkillExecutor {
       // 7. 承認チェック（必要な場合）
       if (skill.requiresApproval(context.responsibility_level)) {
         await this.stateMachine.transition(execution, 'PENDING_APPROVAL');
+        execution.state = 'PENDING_APPROVAL';
         await this.createApprovalRequest(context, execution);
 
         return this.toResult(execution, 'PENDING_APPROVAL');
@@ -138,11 +139,13 @@ export class SkillExecutor {
 
       await this.updateExecutionBudget(execution.id, budgetReservation);
       await this.stateMachine.transition(execution, 'BUDGET_RESERVED');
+      execution.state = 'BUDGET_RESERVED';
 
       // 9. 実行
       await this.stateMachine.transition(execution, 'RUNNING', {
         started_at: new Date().toISOString(),
       });
+      execution.state = 'RUNNING';
 
       const result = await this.executeWithTimeout(skill, context, execution);
 
@@ -156,6 +159,7 @@ export class SkillExecutor {
         result_summary: this.summarize(result.output),
         budget_consumed_amount: result.actual_cost,
       });
+      execution.state = 'COMPLETED';
 
       // 12. 監査ログ
       await this.auditLogger.logSkillExecution(
@@ -173,6 +177,48 @@ export class SkillExecutor {
       await this.handleError(context, execution, error as Error);
       throw error;
     }
+  }
+
+  /**
+   * DBからskill_idとskill_version_idを解決
+   */
+  private async resolveSkillIds(
+    tenantId: string,
+    skillKey: string,
+    version: string
+  ): Promise<{ skillId: string; skillVersionId: string }> {
+    // skillを検索
+    const { data: skillData } = await this.db
+      .from('skills')
+      .select('id, active_version_id')
+      .eq('tenant_id', tenantId)
+      .eq('key', skillKey)
+      .single();
+
+    if (!skillData) {
+      throw new SkillNotFoundError(skillKey, version);
+    }
+
+    // skill_versionを検索（指定バージョンまたはactive_version）
+    let skillVersionId = skillData.active_version_id;
+
+    if (version !== '1.0.0' && version !== skillData.active_version_id) {
+      const { data: versionData } = await this.db
+        .from('skill_versions')
+        .select('id')
+        .eq('skill_id', skillData.id)
+        .eq('version', version)
+        .single();
+
+      if (versionData) {
+        skillVersionId = versionData.id;
+      }
+    }
+
+    return {
+      skillId: skillData.id,
+      skillVersionId: skillVersionId,
+    };
   }
 
   /**
@@ -228,13 +274,20 @@ export class SkillExecutor {
     context: ExecutionContext,
     skill: RegisteredSkill
   ): Promise<Execution> {
+    // DBからskill_idとskill_version_idを解決
+    const { skillId, skillVersionId } = await this.resolveSkillIds(
+      context.tenant_id,
+      context.skill_key,
+      context.skill_version || skill.spec.version
+    );
+
     const { data, error } = await this.db
       .from('skill_executions')
       .insert({
         idempotency_key: context.idempotency_key,
         tenant_id: context.tenant_id,
-        skill_id: skill.spec.key, // 実際はDBのskill_idに解決が必要
-        skill_version_id: skill.spec.version,
+        skill_id: skillId,
+        skill_version_id: skillVersionId,
         skill_key: context.skill_key,
         skill_version: context.skill_version || skill.spec.version,
         executor_type: context.executor_type,

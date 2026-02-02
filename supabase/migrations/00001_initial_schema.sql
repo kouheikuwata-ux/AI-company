@@ -3,8 +3,7 @@
 -- v3.0 責任モデル対応版
 -- ============================================================
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable UUID extension (use gen_random_uuid() which is built-in PostgreSQL 13+)
 
 -- ============================================================
 -- Enums
@@ -35,7 +34,7 @@ CREATE TYPE user_role AS ENUM ('owner', 'admin', 'member');
 -- ============================================================
 
 CREATE TABLE tenants (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   slug TEXT NOT NULL UNIQUE,
   settings JSONB NOT NULL DEFAULT '{}'::jsonb,
@@ -68,7 +67,7 @@ CREATE INDEX idx_users_email ON users(email);
 -- ============================================================
 
 CREATE TABLE skills (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   key TEXT NOT NULL,
   name TEXT NOT NULL,
@@ -91,7 +90,7 @@ CREATE INDEX idx_skills_category ON skills(category);
 -- ============================================================
 
 CREATE TABLE skill_versions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
   version TEXT NOT NULL,
   spec JSONB NOT NULL,
@@ -133,7 +132,7 @@ ALTER TABLE skills ADD CONSTRAINT fk_skills_fallback_version
 -- ============================================================
 
 CREATE TABLE skill_executions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   idempotency_key TEXT NOT NULL,
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   skill_id UUID NOT NULL REFERENCES skills(id),
@@ -190,7 +189,7 @@ CREATE INDEX idx_executions_trace ON skill_executions(trace_id);
 -- ============================================================
 
 CREATE TABLE execution_state_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   execution_id UUID NOT NULL REFERENCES skill_executions(id) ON DELETE CASCADE,
   from_state execution_state NOT NULL,
   to_state execution_state NOT NULL,
@@ -206,7 +205,7 @@ CREATE INDEX idx_state_logs_execution ON execution_state_logs(execution_id);
 -- ============================================================
 
 CREATE TABLE budgets (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   scope_type budget_scope_type NOT NULL DEFAULT 'tenant',
   scope_id UUID,
@@ -231,7 +230,7 @@ CREATE INDEX idx_budgets_active ON budgets(is_active) WHERE is_active = true;
 -- ============================================================
 
 CREATE TABLE budget_reservations (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   budget_id UUID NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
   execution_id UUID REFERENCES skill_executions(id),
   amount NUMERIC(10,4) NOT NULL,
@@ -251,7 +250,7 @@ CREATE INDEX idx_reservations_status ON budget_reservations(status);
 -- ============================================================
 
 CREATE TABLE budget_transactions (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   budget_id UUID NOT NULL REFERENCES budgets(id) ON DELETE CASCADE,
   reservation_id UUID REFERENCES budget_reservations(id),
   execution_id UUID REFERENCES skill_executions(id),
@@ -269,7 +268,7 @@ CREATE INDEX idx_transactions_created ON budget_transactions(created_at DESC);
 -- ============================================================
 
 CREATE TABLE approval_requests (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   execution_id UUID NOT NULL REFERENCES skill_executions(id) ON DELETE CASCADE,
   requester_id UUID NOT NULL,
@@ -293,7 +292,7 @@ CREATE INDEX idx_approvals_expires ON approval_requests(expires_at);
 -- ============================================================
 
 CREATE TABLE audit_logs (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
   action TEXT NOT NULL,
   actor_type executor_type NOT NULL,
