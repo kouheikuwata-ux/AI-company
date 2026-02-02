@@ -13,6 +13,10 @@ const skills = [
   { key: 'governance.decision-brief', name: '判断材料ブリーフ', description: '判断材料を1ページに圧縮して提供', category: 'governance' },
   { key: 'governance.budget-insight', name: '予算・コスト分析', description: 'スキル別・エージェント別のコスト構造を可視化', category: 'governance' },
   { key: 'internal.self-diagnosis', name: '自己診断', description: 'システム内部の自己診断', category: 'internal' },
+  { key: 'internal.summary.create', name: 'サマリー生成', description: '内部サマリー生成スキル', category: 'internal' },
+  { key: 'ai-affairs.request-intake', name: 'スキルリクエスト受付', description: '新規スキルリクエストの受付と自動トリアージ', category: 'ai-affairs' },
+  { key: 'ai-affairs.skill-evaluation', name: 'スキル評価', description: '既存スキルのパフォーマンス評価', category: 'ai-affairs' },
+  { key: 'ai-affairs.skill-deprecation-check', name: 'スキル廃止チェック', description: '使用されていないスキルや問題のあるスキルを検出', category: 'ai-affairs' },
 ];
 
 async function seed() {
