@@ -182,16 +182,55 @@ const result = await skill.execute(
 
 ### イベント駆動
 
-cronに加えて、以下のイベントでもスキルが自動実行されます：
+cronに加えて、24種類のイベントでもスキルが自動実行されます：
 
-- `budget.threshold_warning` - CFO: 予算アラート
-- `system.error_spike` - CTO: 緊急ヘルスチェック
-- `escalation.critical` - CEO: 意思決定ブリーフ生成
+| カテゴリ | イベント | 対象エージェント |
+|----------|----------|-----------------|
+| 予算/コスト | `budget.threshold_warning`, `budget.threshold_exceeded` | CFO |
+| | `cost.anomaly_detected`, `execution.cost_spike` | CFO |
+| システム | `system.error_spike`, `skill.latency_degradation` | CTO |
+| | `security.vulnerability_detected`, `deployment.failed` | CTO |
+| 顧客 | `feedback.negative`, `usage.anomaly`, `user.churn_risk` | CS Manager |
+| 監査 | `security.suspicious_activity`, `policy.violation_detected` | Auditor |
+| | `pii.detected_in_logs`, `permission.elevated` | Auditor |
+| 分析 | `metrics.threshold_breach`, `report.requested` | Analyst |
+| HR | `request.created`, `skill.performance_degraded` | HR Manager |
+| | `skill.version_published` | HR Manager |
+| オペレーション | `workflow.blocked`, `task.overdue` | COO |
+| | `execution.failure_rate_high` | COO |
+| エスカレーション | `escalation.critical` | CEO |
+
+### エージェント間通信
+
+`AgentCommunicationService` を使用してエージェント間のメッセージングとエスカレーションが可能：
+
+```typescript
+import { createCommunicationService, agentRegistry } from '@ai-company-os/agents';
+
+const comm = createCommunicationService(registry, sendEvent);
+
+// メッセージ送信
+await comm.sendMessage({
+  from_agent: 'coo',
+  to_agent: 'ceo',
+  type: 'request',
+  subject: '承認リクエスト',
+  body: { ... },
+});
+
+// エスカレーション（報告先チェーンを辿る）
+await comm.escalate({
+  from_agent: 'analyst',
+  reason: 'exception',
+  context: { ... },
+  urgency: 'today',
+});
+```
 
 ## 次のステップ
 
-1. 残りのスキルの実装
-2. ~~エージェントのスケジューラー統合 (Inngest Cron)~~ ✅ 完了
-3. エージェント間通信の実装
+1. ~~残りのスキルの実装~~ ✅ 16スキル実装完了
+2. ~~エージェントのスケジューラー統合 (Inngest Cron)~~ ✅ 19タスク完了
+3. ~~エージェント間通信の実装~~ ✅ AgentCommunicationService 完了
 4. ダッシュボードUIへのエージェント状態表示
-5. イベントトリガーのInngest統合
+5. ~~イベントトリガーのInngest統合~~ ✅ 24イベント対応完了
