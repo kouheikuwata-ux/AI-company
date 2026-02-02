@@ -1,0 +1,59 @@
+{
+  "cycle": 14,
+  "timestamp": "2026-02-03T00:45:00.000Z",
+  "theme": {
+    "title": "設計図ドキュメントの最終更新",
+    "classification": "E",
+    "classification_name": "DX/可視化",
+    "selection_reason": "cycle 12-13 で実装されたエージェント通信/イベントトリガーがドキュメントに反映されていなかった"
+  },
+  "changes": {
+    "commits": [
+      "060f8ba: docs: Update design doc with completed features"
+    ],
+    "files_modified": [
+      "docs/agents-and-skills.md"
+    ],
+    "key_changes": [
+      "「次のステップ」の完了項目を更新（4/5完了）",
+      "イベント駆動セクションに24イベントのルーティングテーブル追加",
+      "AgentCommunicationService の使用例を追加",
+      "残り1項目: ダッシュボードUIへのエージェント状態表示"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "documented_next_steps_completed": 1
+    },
+    "after": {
+      "documented_next_steps_completed": 4,
+      "documented_next_steps_remaining": 1
+    }
+  },
+  "result": "improved",
+  "session_summary": {
+    "cycles_completed": 14,
+    "total_commits": 16,
+    "skills_added": 3,
+    "scheduled_tasks_added": 7,
+    "event_handlers_added": 3,
+    "major_features": [
+      "HR Manager Inngest cron tasks (4 tasks)",
+      "CS Manager skills (3 skills) + cron tasks (3 tasks)",
+      "AgentCommunicationService (messaging + escalation)",
+      "Event trigger routing (24 event types)"
+    ]
+  },
+  "next_candidates": [
+    {
+      "priority": "P4",
+      "theme": "ダッシュボードUIへのエージェント状態表示",
+      "reason": "設計図の「次のステップ」の最後の項目"
+    },
+    {
+      "priority": "P3",
+      "theme": "スキル実行のDB連携強化",
+      "reason": "プレースホルダーデータを実データに置き換え"
+    }
+  ]
+}
