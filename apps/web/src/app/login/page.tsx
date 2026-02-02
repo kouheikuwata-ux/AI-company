@@ -1,8 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { createBrowserClient, type SupabaseClient } from '@supabase/ssr';
-import type { Database } from '@ai-company-os/database';
+import { createBrowserClient } from '@supabase/ssr';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -11,10 +10,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
   const [mounted, setMounted] = useState(false);
-  const supabaseRef = useRef<SupabaseClient<Database> | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const supabaseRef = useRef<any>(null);
 
   useEffect(() => {
-    supabaseRef.current = createBrowserClient<Database>(
+    supabaseRef.current = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
