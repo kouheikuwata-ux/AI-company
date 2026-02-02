@@ -30,7 +30,7 @@ export const handleSkillExecute = inngest.createFunction(
     id: 'skill-execute',
     retries: 0, // リトライはState Machineで管理
     concurrency: {
-      limit: 10,
+      limit: 5, // Hobby plan limit
       key: 'event.data.tenant_id',
     },
   },
