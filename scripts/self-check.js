@@ -299,8 +299,64 @@ function checkEnvironmentConfig() {
   }, cat);
 }
 
+function checkCompanyOSIntegrity() {
+  console.log('\n7. Company OS Integrity');
+  console.log('   ─────────────────────');
+  const cat = 'company-os';
+
+  // Check minimum skill count
+  check('Skill count >= 10', () => {
+    const registryPath = path.resolve(__dirname, '..', 'packages/skills/src/generated/skill-registry.ts');
+    if (!fs.existsSync(registryPath)) return 'Registry file not found';
+
+    const content = fs.readFileSync(registryPath, 'utf-8');
+    const totalMatch = content.match(/Total skills:\s*(\d+)/);
+    if (!totalMatch) return 'Cannot parse skill count';
+
+    const count = parseInt(totalMatch[1], 10);
+    if (count >= 10) return true;
+    return `Only ${count} skills (expected >= 10)`;
+  }, cat);
+
+  // Check required skill categories
+  check('All required categories exist', () => {
+    const requiredCategories = ['governance', 'operations', 'engineering', 'ai-affairs', 'internal'];
+    const skillsDir = path.resolve(__dirname, '..', 'packages/skills/src');
+
+    const missing = requiredCategories.filter(cat => {
+      const catPath = path.join(skillsDir, cat);
+      return !fs.existsSync(catPath);
+    });
+
+    if (missing.length === 0) return true;
+    return `Missing categories: ${missing.join(', ')}`;
+  }, cat);
+
+  // Check agent definitions exist
+  check('Agent definitions exist', () => {
+    const agentsPath = path.resolve(__dirname, '..', 'packages/agents/src/definitions');
+    if (!fs.existsSync(agentsPath)) return 'Agents directory not found';
+
+    const files = fs.readdirSync(agentsPath);
+    const agentFiles = files.filter(f => f.endsWith('.agent.ts'));
+
+    if (agentFiles.length >= 4) return true;
+    return `Only ${agentFiles.length} agents defined (expected >= 4)`;
+  }, cat);
+
+  // Check design doc alignment
+  check('Design doc exists', () => {
+    return fileExists('docs/agents-and-skills.md');
+  }, cat);
+
+  // Check ops infrastructure
+  check('Ops check infrastructure exists', () => {
+    return fileExists('ops/check/run-checks.ts') && fileExists('ops/report/summarize.ts');
+  }, cat);
+}
+
 function checkTypeScript() {
-  console.log('\n7. TypeScript');
+  console.log('\n8. TypeScript');
   console.log('   ──────────');
   const cat = 'typescript';
 
@@ -401,12 +457,13 @@ async function main() {
   checkSkillRegistry();
   checkInternalSkillProtection();
   checkEnvironmentConfig();
+  checkCompanyOSIntegrity();
 
   // TypeScript check is slow, make it optional
   if (process.argv.includes('--full') || process.argv.includes('-f')) {
     checkTypeScript();
   } else {
-    console.log('\n7. TypeScript');
+    console.log('\n8. TypeScript');
     console.log('   ──────────');
     log(INFO, 'Skipped (use --full to include)');
   }
