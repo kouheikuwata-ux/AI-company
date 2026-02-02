@@ -63,7 +63,7 @@ AI Company OSでは、**エージェント**が会社の役職を担い、**ス�
 
 ## スキル一覧
 
-### 実装済み (13スキル)
+### 実装済み (16スキル)
 
 | Key | 名前 | カテゴリ | 責任レベル |
 |-----|------|---------|-----------|
@@ -79,6 +79,9 @@ AI Company OSでは、**エージェント**が会社の役職を担い、**ス�
 | `ai-affairs.skill-deprecation-check` | スキル廃止チェック | ai-affairs | AI_WITH_REVIEW |
 | `ai-affairs.request-intake` | スキル追加リクエスト | ai-affairs | HUMAN_APPROVED |
 | `ai-affairs.performance-improvement` | パフォーマンス改善提案 | ai-affairs | AI_WITH_REVIEW |
+| `cs.feedback-analysis` | フィードバック分析 | cs | AI_WITH_REVIEW |
+| `cs.usage-pattern` | 利用パターン分析 | cs | AI_WITH_REVIEW |
+| `cs.satisfaction-report` | 満足度レポート | cs | AI_WITH_REVIEW |
 | `internal.summary.create` | テキスト要約 | internal | AI_INTERNAL_ONLY |
 
 ## 責任レベル
@@ -163,6 +166,13 @@ const result = await skill.execute(
 | CTO | スキルパフォーマンスレビュー | 平日11時 | engineering.skill-performance |
 | CTO | 週次セキュリティスキャン | 日曜6時 | engineering.security-scan |
 | CTO | 週次改善提案 | 金曜14時 | engineering.improvement-proposal |
+| HR Manager | 日次リクエストレビュー | 平日10時 | ai-affairs.request-intake |
+| HR Manager | 週次スキル評価 | 水曜14時 | ai-affairs.skill-evaluation |
+| HR Manager | 週次改善提案 | 金曜15時 | ai-affairs.performance-improvement |
+| HR Manager | 月次廃止チェック | 毎月1日10時 | ai-affairs.skill-deprecation-check |
+| CS Manager | 日次フィードバックサマリー | 平日17時 | cs.feedback-analysis |
+| CS Manager | 週次利用レポート | 月曜11時 | cs.usage-pattern |
+| CS Manager | 月次満足度レポート | 毎月1日10時 | cs.satisfaction-report |
 
 ### Inngestダッシュボード
 
