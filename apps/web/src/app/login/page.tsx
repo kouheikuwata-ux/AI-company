@@ -1,15 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { createBrowserClient } from '@supabase/ssr';
+import { useState, useEffect, useRef } from 'react';
+import { createBrowserClient, type SupabaseClient } from '@supabase/ssr';
 import type { Database } from '@ai-company-os/database';
-
-function createClient() {
-  return createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  );
-}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -17,13 +10,25 @@ export default function LoginPage() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
+  const supabaseRef = useRef<SupabaseClient<Database> | null>(null);
 
-  const supabase = createClient();
+  useEffect(() => {
+    supabaseRef.current = createBrowserClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    setMounted(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!supabaseRef.current) return;
+
     setLoading(true);
     setMessage(null);
+
+    const supabase = supabaseRef.current;
 
     try {
       if (isSignUp) {
@@ -67,6 +72,16 @@ export default function LoginPage() {
       setLoading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <p className="text-gray-500">読み込み中...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-900">
