@@ -30,6 +30,8 @@ interface SelfCheckResult {
 
 interface DeprecationCheckResult {
   success: boolean;
+  skipped?: boolean;
+  skip_reason?: string;
   duration_ms: number;
   total_skills_checked: number;
   deprecation_candidates: number;
@@ -131,13 +133,14 @@ async function runDeprecationCheck(): Promise<DeprecationCheckResult> {
 
   if (!SUPABASE_SERVICE_KEY) {
     return {
-      success: false,
+      success: true,
+      skipped: true,
+      skip_reason: 'SUPABASE_SERVICE_ROLE_KEY not set',
       duration_ms: Date.now() - startTime,
       total_skills_checked: 0,
       deprecation_candidates: 0,
       healthy_skills_count: 0,
       candidates: [],
-      error: 'SUPABASE_SERVICE_ROLE_KEY not set',
     };
   }
 
@@ -240,7 +243,10 @@ async function main() {
   // 2. deprecation-check 実行
   console.log('2. skill-deprecation-check を実行中...');
   const deprecationResult = await runDeprecationCheck();
-  console.log(`   完了: ${deprecationResult.success ? '成功' : '失敗'} (${deprecationResult.duration_ms}ms)`);
+  const deprecationStatus = deprecationResult.skipped
+    ? `スキップ (${deprecationResult.skip_reason})`
+    : deprecationResult.success ? '成功' : '失敗';
+  console.log(`   完了: ${deprecationStatus} (${deprecationResult.duration_ms}ms)`);
 
   // 3. サマリー計算
   const criticalIssues =

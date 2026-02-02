@@ -23,6 +23,8 @@ interface SelfCheckResult {
 
 interface DeprecationCheckResult {
   success: boolean;
+  skipped?: boolean;
+  skip_reason?: string;
   duration_ms: number;
   total_skills_checked: number;
   deprecation_candidates: number;
@@ -56,6 +58,11 @@ interface Issue {
   is_regression?: boolean;
 }
 
+interface SkippedCheck {
+  name: string;
+  reason: string;
+}
+
 interface SummaryReport {
   generated_at: string;
   run_timestamp: string;
@@ -64,6 +71,7 @@ interface SummaryReport {
     P1: Issue[];
     P2: Issue[];
   };
+  skipped_checks: SkippedCheck[];
   regressions: Issue[];
   improvements: Issue[];
   overall_health: 'critical' | 'warning' | 'healthy';
@@ -143,8 +151,8 @@ function generateIssues(run: RunReport, latest: RunReport | null): {
     }
   }
 
-  // 3. deprecation-check の失敗
-  if (!run.deprecation_check.success) {
+  // 3. deprecation-check の失敗（スキップは除外）
+  if (!run.deprecation_check.success && !run.deprecation_check.skipped) {
     issues.P1.push({
       priority: 'P1',
       category: 'deprecation-check',
@@ -330,6 +338,14 @@ function printSummary(summary: SummaryReport): void {
     console.log('  No issues found! 🎉\n');
   }
 
+  if (summary.skipped_checks.length > 0) {
+    console.log('ℹ️ Skipped Checks:');
+    for (const skip of summary.skipped_checks) {
+      console.log(`  • ${skip.name}: ${skip.reason}`);
+    }
+    console.log('');
+  }
+
   if (summary.regressions.length > 0) {
     console.log('─────────────────────────────────────────────────────────────');
     console.log('⬇️ REGRESSIONS (since last run)');
@@ -377,11 +393,21 @@ function main() {
   // Issue 生成
   const { issues, regressions, improvements } = generateIssues(run, latest);
 
+  // スキップされたチェックを収集
+  const skipped_checks: SkippedCheck[] = [];
+  if (run.deprecation_check.skipped) {
+    skipped_checks.push({
+      name: 'deprecation-check',
+      reason: run.deprecation_check.skip_reason || 'Unknown reason',
+    });
+  }
+
   // サマリー生成
   const summary: SummaryReport = {
     generated_at: new Date().toISOString(),
     run_timestamp: run.timestamp,
     issues,
+    skipped_checks,
     regressions,
     improvements,
     overall_health: determineOverallHealth(issues),
