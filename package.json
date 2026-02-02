@@ -14,12 +14,15 @@
     "db:push": "turbo run db:push",
     "skills:generate": "turbo run skills:generate",
     "skills:validate": "turbo run skills:validate",
-    "self-check": "node scripts/self-check.js"
+    "self-check": "node scripts/self-check.js",
+    "ops:check": "npx tsx ops/check/run-checks.ts",
+    "ops:report": "npx tsx ops/report/summarize.ts"
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "eslint": "^8.57.0",
     "prettier": "^3.2.4",
+    "tsx": "^4.7.0",
     "turbo": "^2.3.0",
     "typescript": "^5.3.3"
   },

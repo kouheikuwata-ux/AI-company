@@ -73,7 +73,25 @@ pnpm db:push          # マイグレーション
 # スキル
 pnpm skills:generate  # Registry生成
 pnpm skills:validate  # スキル検証
+
+# 運用チェック
+pnpm ops:check        # システムチェック実行
+pnpm ops:report       # レポート生成
 ```
+
+## 運用チェック（ops）
+
+システムの健全性を自動チェックし、問題を検出・レポートします。
+
+```bash
+# 1. チェック実行（結果を run.json に保存）
+npm run ops:check
+
+# 2. レポート生成（P0/P1/P2 分類で出力）
+npm run ops:report
+```
+
+詳細は [ops/README.md](./ops/README.md) を参照してください。
 
 ## 設計原則（v3.0）
 

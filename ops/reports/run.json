@@ -1,0 +1,128 @@
+{
+  "timestamp": "2026-02-02T14:34:42.577Z",
+  "self_check": {
+    "success": true,
+    "duration_ms": 1059,
+    "stdout_summary": "  [\u001b[32mPASS\u001b[0m] governance/ category exists\n  [\u001b[32mPASS\u001b[0m] internal/ category exists\n  [\u001b[32mPASS\u001b[0m] Registry has skills registered\n5. Internal Skill Protection\n   ──────────────────────────\n  [\u001b[32mPASS\u001b[0m] API execute route has internal check\n  [\u001b[32mPASS\u001b[0m] Inngest handler has internal check\n  [\u001b[32mPASS\u001b[0m] Skills list API excludes internal\n6. Environment Configuration\n   ──────────────────────────\n  [\u001b[32mPASS\u001b[0m] .env.example exists\n  [\u001b[32mPASS\u001b[0m] .env.local configured\n  [\u001b[",
+    "checks": [
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] Root package.json exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] pnpm-workspace.yaml exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] turbo.json exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] packages/skill-spec exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] packages/database exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] packages/runner exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] packages/skills exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] apps/web exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] node_modules installed",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] Node.js version >= 20",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] pnpm available",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] skill-spec dist exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] database dist exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] runner dist exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] skills dist exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] web .next exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] Generated registry exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] governance/ category exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] internal/ category exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] Registry has skills registered",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] API execute route has internal che",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] Inngest handler has internal check",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] Skills list API excludes internal",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] .env.example exists",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] .env.local configured",
+        "status": "pass"
+      },
+      {
+        "name": "[\u001b[32mPASS\u001b[0m] .env.example has required vars",
+        "status": "pass"
+      }
+    ]
+  },
+  "deprecation_check": {
+    "success": false,
+    "duration_ms": 0,
+    "total_skills_checked": 0,
+    "deprecation_candidates": 0,
+    "healthy_skills_count": 0,
+    "candidates": [],
+    "error": "SUPABASE_SERVICE_ROLE_KEY not set"
+  },
+  "summary": {
+    "total_issues": 0,
+    "critical_issues": 0,
+    "warnings": 0
+  }
+}
