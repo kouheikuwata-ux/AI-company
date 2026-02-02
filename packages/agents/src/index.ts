@@ -53,6 +53,17 @@ export type { AgentContext, AgentRunResult, Decision, DecisionAction } from './r
 // Decision Engine
 export { DecisionEngine, addCustomRule, getSkillRules } from './decision-engine';
 
+// Communication Service
+export {
+  AgentCommunicationService,
+  createCommunicationService,
+} from './communication';
+export type {
+  SendMessageOptions,
+  EscalateOptions,
+  CommunicationResult,
+} from './communication';
+
 // Individual agent definitions
 export {
   ceoAgent,

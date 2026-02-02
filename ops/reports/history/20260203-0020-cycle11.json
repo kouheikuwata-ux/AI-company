@@ -1,0 +1,51 @@
+{
+  "cycle": 11,
+  "timestamp": "2026-02-03T00:20:00.000Z",
+  "theme": {
+    "title": "設計図ドキュメントの更新（スキル16個、タスク19個反映）",
+    "classification": "E",
+    "classification_name": "DX/可視化",
+    "selection_reason": "cycle10 の実装（CS Manager スキル＆タスク）がドキュメントに反映されていなかった"
+  },
+  "changes": {
+    "commits": [
+      "a4e3883: docs: Update skill list (16 skills) and cron tasks (19 tasks)"
+    ],
+    "files_modified": [
+      "docs/agents-and-skills.md"
+    ],
+    "key_changes": [
+      "スキル一覧を13個から16個に更新",
+      "cs.feedback-analysis, cs.usage-pattern, cs.satisfaction-report を追加",
+      "Inngest cronテーブルにHR Manager 4タスク、CS Manager 3タスクを追加"
+    ]
+  },
+  "metrics": {
+    "before": {
+      "documented_skills": 13,
+      "documented_cron_tasks": 12
+    },
+    "after": {
+      "documented_skills": 16,
+      "documented_cron_tasks": 19
+    }
+  },
+  "result": "improved",
+  "next_candidates": [
+    {
+      "priority": "P2",
+      "theme": "エージェント間通信の設計・実装",
+      "reason": "設計図の「次のステップ」項目3。全エージェントの定期タスクが完了したため次のフェーズへ"
+    },
+    {
+      "priority": "P3",
+      "theme": "スキル実行のDB連携強化",
+      "reason": "プレースホルダーデータを実データに置き換え"
+    },
+    {
+      "priority": "P3",
+      "theme": "イベントトリガーのInngest統合",
+      "reason": "設計図の「次のステップ」項目5"
+    }
+  ]
+}

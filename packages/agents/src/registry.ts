@@ -246,5 +246,8 @@ class AgentRegistry {
 // Singleton instance
 export const agentRegistry = new AgentRegistry();
 
+// Export class for type usage
+export { AgentRegistry };
+
 // Re-export for convenience
 export { allAgents, organizationChart };
