@@ -633,6 +633,121 @@ export const hrMonthlyDeprecationCheck = inngest.createFunction(
 );
 
 // ============================================================
+// CS Manager Agent Scheduled Tasks
+// ============================================================
+
+/**
+ * CS Manager: 日次フィードバックサマリー
+ * 平日17時
+ */
+export const csDailyFeedbackSummary = inngest.createFunction(
+  {
+    id: 'cs-daily-feedback-summary',
+    name: 'CS Manager Agent: 日次フィードバックサマリー',
+  },
+  { cron: '0 17 * * 1-5' },  // 平日17時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('cs-manager');
+    if (!agent) throw new Error('CS Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'daily-feedback-summary');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `cs-feedback-${new Date().toISOString().split('T')[0]}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'cs-manager', task: 'daily-feedback-summary' };
+  }
+);
+
+/**
+ * CS Manager: 週次利用レポート
+ * 毎週月曜11時
+ */
+export const csWeeklyUsageReport = inngest.createFunction(
+  {
+    id: 'cs-weekly-usage-report',
+    name: 'CS Manager Agent: 週次利用レポート',
+  },
+  { cron: '0 11 * * 1' },  // 毎週月曜11時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('cs-manager');
+    if (!agent) throw new Error('CS Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'weekly-usage-report');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `cs-usage-${new Date().toISOString().split('T')[0]}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'cs-manager', task: 'weekly-usage-report' };
+  }
+);
+
+/**
+ * CS Manager: 月次満足度レポート
+ * 毎月1日10時
+ */
+export const csMonthlyeSatisfactionReport = inngest.createFunction(
+  {
+    id: 'cs-monthly-satisfaction-report',
+    name: 'CS Manager Agent: 月次満足度レポート',
+  },
+  { cron: '0 10 1 * *' },  // 毎月1日10時 (JST)
+  async ({ step }) => {
+    const agent = agentRegistry.get('cs-manager');
+    if (!agent) throw new Error('CS Manager agent not found');
+
+    const taskConfig = agent.scheduled_tasks.find(t => t.task_key === 'monthly-satisfaction-report');
+    if (!taskConfig) throw new Error('Task config not found');
+
+    await step.sendEvent('execute-skill', {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: taskConfig.skill_key,
+        input: taskConfig.default_input || {},
+        idempotency_key: `cs-satisfaction-${new Date().toISOString().slice(0, 7)}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: uuidv4(),
+        request_origin: 'scheduled',
+      },
+    });
+
+    return { status: 'triggered', agent: 'cs-manager', task: 'monthly-satisfaction-report' };
+  }
+);
+
+// ============================================================
 // Export all scheduled task functions
 // ============================================================
 
@@ -658,4 +773,8 @@ export const agentScheduledTaskFunctions = [
   hrWeeklySkillEvaluation,
   hrWeeklyImprovementProposals,
   hrMonthlyDeprecationCheck,
+  // CS Manager
+  csDailyFeedbackSummary,
+  csWeeklyUsageReport,
+  csMonthlyeSatisfactionReport,
 ];
