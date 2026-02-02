@@ -285,9 +285,17 @@ export default async function DashboardPage() {
             AI Company OS 管理画面
           </p>
         </div>
-        <div className="text-right text-sm">
-          <p className="font-medium">{user.display_name || user.email}</p>
-          <p className="text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
+        <div className="text-right text-sm flex items-center gap-4">
+          <div>
+            <p className="font-medium">{user.display_name || user.email}</p>
+            <p className="text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
+          </div>
+          <a
+            href="/api/auth/logout"
+            className="px-3 py-1 text-sm bg-gray-200 dark:bg-gray-700 rounded hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+          >
+            ログアウト
+          </a>
         </div>
       </header>
 
