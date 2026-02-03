@@ -1,6 +1,13 @@
 import { initializeRegistry } from '@ai-company-os/skills';
+import { agentRegistry } from '@ai-company-os/agents';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/auth/helpers';
+import {
+  MetricCard,
+  AgentStatusCard,
+  ExecutionTimeline,
+  SkillStatsCard,
+} from '@/components/dashboard';
 
 // 動的レンダリング強制（最新ログを必ず反映）
 export const dynamic = 'force-dynamic';
@@ -161,6 +168,166 @@ async function fetchPendingApprovals(): Promise<PendingApproval[]> {
   }
 }
 
+interface AgentStatus {
+  key: string;
+  name: string;
+  role: string;
+  department: string;
+  status: 'active' | 'idle' | 'busy' | 'error';
+  lastActivity?: string;
+  currentTask?: string;
+}
+
+/**
+ * エージェントステータス取得
+ */
+async function fetchAgentStatuses(): Promise<AgentStatus[]> {
+  const agents = agentRegistry.getAll();
+  const supabase = createAdminClient();
+
+  // 各エージェントの最新の実行を取得
+  const agentStatuses: AgentStatus[] = [];
+
+  for (const agent of agents) {
+    let status: 'active' | 'idle' | 'busy' | 'error' = 'idle';
+    let lastActivity: string | undefined;
+    let currentTask: string | undefined;
+
+    try {
+      // 実行中のタスクを確認
+      const { data: runningExec } = await supabase
+        .from('skill_executions')
+        .select('skill_key, created_at')
+        .eq('executor_id', agent.id)
+        .eq('state', 'RUNNING')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (runningExec) {
+        const execData = runningExec as { skill_key: string; created_at: string };
+        status = 'busy';
+        currentTask = execData.skill_key;
+      } else {
+        // 最新の完了済みタスクを確認
+        const { data: lastExec } = await supabase
+          .from('skill_executions')
+          .select('completed_at, state')
+          .eq('executor_id', agent.id)
+          .in('state', ['COMPLETED', 'FAILED'])
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        if (lastExec) {
+          const execData = lastExec as { state: string; completed_at: string | null };
+          status = execData.state === 'FAILED' ? 'error' : 'active';
+          lastActivity = execData.completed_at || undefined;
+        }
+      }
+    } catch {
+      // エラーの場合はidle状態のまま
+    }
+
+    agentStatuses.push({
+      key: agent.key,
+      name: agent.name,
+      role: agent.role,
+      department: agent.department,
+      status,
+      lastActivity,
+      currentTask,
+    });
+  }
+
+  return agentStatuses;
+}
+
+interface SkillStat {
+  skill_key: string;
+  total: number;
+  completed: number;
+  failed: number;
+  success_rate: number;
+}
+
+/**
+ * スキル別統計取得
+ */
+async function fetchSkillStats(): Promise<SkillStat[]> {
+  try {
+    const supabase = createAdminClient();
+
+    const { data } = await supabase
+      .from('skill_executions')
+      .select('skill_key, state');
+
+    if (!data) return [];
+
+    const skillMap = new Map<string, { total: number; completed: number; failed: number }>();
+
+    for (const row of data) {
+      const rowData = row as { skill_key: string; state: string };
+      if (!skillMap.has(rowData.skill_key)) {
+        skillMap.set(rowData.skill_key, { total: 0, completed: 0, failed: 0 });
+      }
+      const stats = skillMap.get(rowData.skill_key)!;
+      stats.total++;
+      if (rowData.state === 'COMPLETED') {
+        stats.completed++;
+      } else if (rowData.state === 'FAILED') {
+        stats.failed++;
+      }
+    }
+
+    return Array.from(skillMap.entries())
+      .map(([skill_key, stats]) => ({
+        skill_key,
+        total: stats.total,
+        completed: stats.completed,
+        failed: stats.failed,
+        success_rate: stats.total > 0
+          ? Math.round((stats.completed / stats.total) * 100)
+          : 0,
+      }))
+      .sort((a, b) => b.total - a.total);
+  } catch (err) {
+    console.error('[Dashboard] Failed to fetch skill stats:', err);
+    return [];
+  }
+}
+
+interface TimelineExecution {
+  id: string;
+  skill_key: string;
+  state: string;
+  created_at: string;
+  completed_at?: string;
+  result_status?: string;
+  executor_type: string;
+  executor_id: string;
+}
+
+/**
+ * タイムライン用実行履歴取得（より詳細なデータ）
+ */
+async function fetchTimelineExecutions(): Promise<TimelineExecution[]> {
+  try {
+    const supabase = createAdminClient();
+
+    const { data } = await supabase
+      .from('skill_executions')
+      .select('id, skill_key, state, created_at, completed_at, result_status, executor_type, executor_id')
+      .order('created_at', { ascending: false })
+      .limit(15);
+
+    return (data as TimelineExecution[]) || [];
+  } catch (err) {
+    console.error('[Dashboard] Failed to fetch timeline executions:', err);
+    return [];
+  }
+}
+
 /**
  * 診断ログをDB直読で取得（service_role でRLSバイパス）
  */
@@ -263,14 +430,25 @@ export default async function DashboardPage() {
   const totalSkillCount = allSkills.length;
 
   // 並列でDBデータ取得
-  const [result, executionMetrics, budgetMetrics, recentExecutions, pendingApprovals] =
-    await Promise.all([
-      fetchDiagnosisLogsFromDB(),
-      fetchExecutionMetrics(),
-      fetchBudgetMetrics(),
-      fetchRecentExecutions(),
-      fetchPendingApprovals(),
-    ]);
+  const [
+    result,
+    executionMetrics,
+    budgetMetrics,
+    recentExecutions,
+    pendingApprovals,
+    agentStatuses,
+    skillStats,
+    timelineExecutions,
+  ] = await Promise.all([
+    fetchDiagnosisLogsFromDB(),
+    fetchExecutionMetrics(),
+    fetchBudgetMetrics(),
+    fetchRecentExecutions(),
+    fetchPendingApprovals(),
+    fetchAgentStatuses(),
+    fetchSkillStats(),
+    fetchTimelineExecutions(),
+  ]);
 
   const fetchFailed = !result.success;
   const logs = result.success ? result.logs : [];
@@ -431,6 +609,17 @@ export default async function DashboardPage() {
             </ul>
           )}
         </section>
+      </div>
+
+      {/* Agent Status Section */}
+      <section className="mt-8">
+        <AgentStatusCard agents={agentStatuses} />
+      </section>
+
+      {/* Execution Timeline and Skill Stats */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-8">
+        <ExecutionTimeline executions={timelineExecutions} maxItems={10} />
+        <SkillStatsCard skills={skillStats} maxItems={10} />
       </div>
     </div>
   );

@@ -406,6 +406,148 @@ export const execute: SkillHandler = async (
     execution_count: number;
   }> = [];
 
+  // 注入データから日別トレンドを構築
+  const injectedData = input._budget_data as {
+    budget?: {
+      limit_amount: number;
+      used_amount: number;
+      reserved_amount: number;
+    };
+    daily_costs?: Array<{
+      date: string;
+      cost: number;
+      executions: number;
+    }>;
+    skill_costs?: Array<{
+      skill_key: string;
+      skill_name: string;
+      execution_count: number;
+      total_cost: number;
+    }>;
+    agent_costs?: Array<{
+      executor_type: 'user' | 'agent' | 'system';
+      executor_id: string;
+      execution_count: number;
+      total_cost: number;
+    }>;
+  } | undefined;
+
+  // 注入データがあれば更新
+  if (injectedData?.budget) {
+    budgetOverview.total_limit = injectedData.budget.limit_amount;
+    budgetOverview.total_used = injectedData.budget.used_amount;
+    budgetOverview.total_reserved = injectedData.budget.reserved_amount;
+    budgetOverview.available = budgetOverview.total_limit - budgetOverview.total_used - budgetOverview.total_reserved;
+    budgetOverview.utilization_rate = budgetOverview.total_limit > 0
+      ? (budgetOverview.total_used / budgetOverview.total_limit) * 100
+      : 0;
+  }
+
+  if (injectedData?.daily_costs) {
+    for (const dc of injectedData.daily_costs) {
+      dailyTrend.push({
+        date: dc.date,
+        total_cost: dc.cost,
+        execution_count: dc.executions,
+      });
+    }
+  }
+
+  if (injectedData?.skill_costs) {
+    for (const sc of injectedData.skill_costs) {
+      costBySkill.push({
+        skill_key: sc.skill_key,
+        skill_name: sc.skill_name,
+        execution_count: sc.execution_count,
+        total_reserved: 0,
+        total_consumed: sc.total_cost,
+        total_released: 0,
+        average_cost_per_execution: sc.execution_count > 0 ? sc.total_cost / sc.execution_count : 0,
+        cost_variance: 0,
+      });
+    }
+  }
+
+  if (injectedData?.agent_costs) {
+    for (const ac of injectedData.agent_costs) {
+      costByAgent.push({
+        executor_type: ac.executor_type,
+        executor_id: ac.executor_id,
+        execution_count: ac.execution_count,
+        total_consumed: ac.total_cost,
+        skill_breakdown: [],
+      });
+    }
+  }
+
+  // LLMを使用して異常検知の分析コメントを生成
+  if (anomalies.length > 0 || costBySkill.length > 0) {
+    try {
+      const systemPrompt = parsed.language === 'ja'
+        ? `あなたは予算管理の専門家です。コストデータを分析し、異常や懸念点を検出します。
+結論・推奨は出さず、事実に基づいた分析のみを行ってください。`
+        : `You are a budget management expert. Analyze cost data and detect anomalies or concerns.
+Do not make recommendations, only fact-based analysis.`;
+
+      const userPrompt = parsed.language === 'ja'
+        ? `以下のコストデータを分析し、追加の異常や懸念点があれば報告してください。
+
+【予算概要】
+- 上限: ${budgetOverview.total_limit.toFixed(2)} USD
+- 使用済み: ${budgetOverview.total_used.toFixed(2)} USD
+- 利用率: ${budgetOverview.utilization_rate.toFixed(1)}%
+
+【スキル別コスト】
+${costBySkill.slice(0, 5).map(s => `- ${s.skill_key}: ${s.total_consumed.toFixed(2)} USD (${s.execution_count}回)`).join('\n') || 'なし'}
+
+【検知済み異常】
+${anomalies.map(a => `- ${a.type}: ${a.message}`).join('\n') || 'なし'}
+
+JSON形式で返してください:
+{"additional_anomalies": [{"type": "cost_spike|unusual_pattern", "severity": "info|warning|critical", "message": "説明"}]}`
+        : `Analyze the following cost data and report any additional anomalies or concerns.
+
+【Budget Overview】
+- Limit: ${budgetOverview.total_limit.toFixed(2)} USD
+- Used: ${budgetOverview.total_used.toFixed(2)} USD
+- Utilization: ${budgetOverview.utilization_rate.toFixed(1)}%
+
+【Cost by Skill】
+${costBySkill.slice(0, 5).map(s => `- ${s.skill_key}: ${s.total_consumed.toFixed(2)} USD (${s.execution_count} times)`).join('\n') || 'None'}
+
+【Detected Anomalies】
+${anomalies.map(a => `- ${a.type}: ${a.message}`).join('\n') || 'None'}
+
+Return in JSON format:
+{"additional_anomalies": [{"type": "cost_spike|unusual_pattern", "severity": "info|warning|critical", "message": "description"}]}`;
+
+      const response = await context.llm.chat({
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        max_tokens: 800,
+        temperature: 0.2,
+      });
+
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+        if (result.additional_anomalies) {
+          for (const a of result.additional_anomalies) {
+            anomalies.push({
+              type: a.type || 'unusual_pattern',
+              severity: a.severity || 'info',
+              message: a.message || '',
+              data: {},
+              detected_at: new Date().toISOString(),
+            });
+          }
+        }
+      }
+    } catch (error) {
+      context.logger.warn('Failed to analyze anomalies via LLM', { error });
+    }
+  }
+
   const output: Output = {
     report_metadata: {
       generated_at: new Date().toISOString(),

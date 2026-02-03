@@ -366,7 +366,7 @@ export const execute: SkillHandler = async (
     recommended_actions: recommendedActions,
     audit_trail: {
       check_id: checkId,
-      executor: context.executionId || 'unknown',
+      executor: context.execution_id || 'unknown',
       duration_ms: duration,
       checks_performed: categoriesToCheck,
     },

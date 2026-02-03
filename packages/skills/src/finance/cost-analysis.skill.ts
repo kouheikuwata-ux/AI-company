@@ -279,8 +279,198 @@ export const execute: SkillHandler = async (
     implementation_effort: 'low' | 'medium' | 'high';
   }> = [];
 
-  // 提案を含める場合
-  if (parsed.include_recommendations) {
+  // 注入データを取得
+  const injectedData = input._cost_data as {
+    executions?: Array<{
+      skill_key: string;
+      skill_name: string;
+      state: string;
+      cost: number;
+      created_at: string;
+    }>;
+    total_budget?: number;
+    previous_period_cost?: number;
+  } | undefined;
+
+  // 注入データがあれば集計
+  if (injectedData?.executions) {
+    const skillMap = new Map<string, {
+      name: string;
+      executions: number;
+      total_cost: number;
+      category: string;
+    }>();
+
+    for (const exec of injectedData.executions) {
+      if (!skillMap.has(exec.skill_key)) {
+        skillMap.set(exec.skill_key, {
+          name: exec.skill_name,
+          executions: 0,
+          total_cost: 0,
+          category: exec.skill_key.split('.')[0],
+        });
+      }
+      const data = skillMap.get(exec.skill_key)!;
+      data.executions++;
+      data.total_cost += exec.cost || 0;
+    }
+
+    // サマリー更新
+    summary.total_executions = injectedData.executions.length;
+    summary.total_cost = injectedData.executions.reduce((sum, e) => sum + (e.cost || 0), 0);
+    summary.avg_cost_per_execution = summary.total_executions > 0
+      ? summary.total_cost / summary.total_executions
+      : 0;
+
+    // 前期比
+    if (injectedData.previous_period_cost && injectedData.previous_period_cost > 0) {
+      summary.period_over_period_change =
+        (summary.total_cost - injectedData.previous_period_cost) / injectedData.previous_period_cost;
+    }
+
+    // 予算消化率
+    if (injectedData.total_budget && injectedData.total_budget > 0) {
+      summary.budget_utilization = (summary.total_cost / injectedData.total_budget) * 100;
+    }
+
+    // 月次予測
+    const daysInPeriod = (periodEnd.getTime() - periodStart.getTime()) / (1000 * 60 * 60 * 24);
+    summary.projected_monthly_cost = daysInPeriod > 0
+      ? (summary.total_cost / daysInPeriod) * 30
+      : 0;
+
+    // スキル別詳細
+    for (const [skillKey, data] of skillMap) {
+      topCostSkills.push({
+        skill_key: skillKey,
+        skill_name: data.name,
+        executions: data.executions,
+        total_cost: data.total_cost,
+        avg_cost_per_execution: data.executions > 0 ? data.total_cost / data.executions : 0,
+        cost_efficiency_score: 80, // 仮のスコア
+        trend: 'stable',
+      });
+
+      // カテゴリ別集計更新
+      const catIndex = breakdownByCategory.findIndex(c => c.category === data.category);
+      if (catIndex >= 0) {
+        breakdownByCategory[catIndex].amount += data.total_cost;
+      }
+    }
+
+    // カテゴリ別パーセンテージ計算
+    for (const cat of breakdownByCategory) {
+      cat.percentage = summary.total_cost > 0
+        ? Math.round((cat.amount / summary.total_cost) * 100)
+        : 0;
+    }
+
+    // トップコストスキルをソート
+    topCostSkills.sort((a, b) => b.total_cost - a.total_cost);
+  }
+
+  // LLMを使用して提案とエグゼクティブサマリーを生成
+  let executiveSummary = {
+    headline: summary.total_cost === 0
+      ? '分析対象期間のコストデータがありません'
+      : `総コスト ${summary.total_cost.toFixed(2)} USD`,
+    key_insights: [] as string[],
+    action_items: [] as string[],
+  };
+
+  if (parsed.include_recommendations || parsed.detail_level === 'executive') {
+    try {
+      const systemPrompt = parsed.language === 'ja'
+        ? `あなたはコスト分析の専門家です。データに基づいて具体的な最適化提案を行います。
+- 推奨は実行可能で具体的なものにしてください
+- 優先度と実装の難易度を明確にしてください`
+        : `You are a cost analysis expert. Make specific optimization recommendations based on data.
+- Recommendations should be actionable and specific
+- Clearly state priority and implementation effort`;
+
+      const userPrompt = parsed.language === 'ja'
+        ? `以下のコストデータを分析し、最適化提案とエグゼクティブサマリーを生成してください。
+
+【コストサマリー】
+- 総コスト: ${summary.total_cost.toFixed(2)} USD
+- 実行数: ${summary.total_executions}
+- 平均コスト/実行: ${summary.avg_cost_per_execution.toFixed(4)} USD
+- 前期比: ${(summary.period_over_period_change * 100).toFixed(1)}%
+- 予算消化率: ${summary.budget_utilization.toFixed(1)}%
+
+【トップコストスキル】
+${topCostSkills.slice(0, 5).map(s => `- ${s.skill_key}: ${s.total_cost.toFixed(2)} USD (${s.executions}回)`).join('\n') || 'なし'}
+
+【カテゴリ別】
+${breakdownByCategory.filter(c => c.amount > 0).map(c => `- ${c.category}: ${c.amount.toFixed(2)} USD (${c.percentage}%)`).join('\n') || 'なし'}
+
+JSON形式で返してください:
+{
+  "recommendations": [
+    {"category": "cost_reduction|efficiency|budget_reallocation|deprecation", "title": "タイトル", "description": "説明", "estimated_savings": 0, "priority": "high|medium|low", "implementation_effort": "low|medium|high"}
+  ],
+  "executive_summary": {
+    "headline": "ヘッドライン",
+    "key_insights": ["インサイト1", "インサイト2"],
+    "action_items": ["アクション1", "アクション2"]
+  }
+}`
+        : `Analyze the following cost data and generate optimization recommendations and executive summary.
+
+【Cost Summary】
+- Total Cost: ${summary.total_cost.toFixed(2)} USD
+- Executions: ${summary.total_executions}
+- Avg Cost/Execution: ${summary.avg_cost_per_execution.toFixed(4)} USD
+- Period Change: ${(summary.period_over_period_change * 100).toFixed(1)}%
+- Budget Utilization: ${summary.budget_utilization.toFixed(1)}%
+
+【Top Cost Skills】
+${topCostSkills.slice(0, 5).map(s => `- ${s.skill_key}: ${s.total_cost.toFixed(2)} USD (${s.executions} times)`).join('\n') || 'None'}
+
+【By Category】
+${breakdownByCategory.filter(c => c.amount > 0).map(c => `- ${c.category}: ${c.amount.toFixed(2)} USD (${c.percentage}%)`).join('\n') || 'None'}
+
+Return in JSON format (same structure as above)`;
+
+      const response = await context.llm.chat({
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        max_tokens: 1500,
+        temperature: 0.3,
+      });
+
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+
+        if (result.recommendations) {
+          for (const r of result.recommendations) {
+            recommendations.push({
+              category: r.category || 'efficiency',
+              title: r.title || '',
+              description: r.description || '',
+              estimated_savings: r.estimated_savings,
+              priority: r.priority || 'medium',
+              implementation_effort: r.implementation_effort || 'medium',
+            });
+          }
+        }
+
+        if (result.executive_summary) {
+          executiveSummary = {
+            headline: result.executive_summary.headline || executiveSummary.headline,
+            key_insights: result.executive_summary.key_insights || [],
+            action_items: result.executive_summary.action_items || [],
+          };
+        }
+      }
+    } catch (error) {
+      context.logger.warn('Failed to generate recommendations via LLM', { error });
+    }
+  }
+
+  // フォールバック
+  if (recommendations.length === 0 && parsed.include_recommendations) {
     if (summary.total_cost === 0) {
       recommendations.push({
         category: 'efficiency',
@@ -292,16 +482,15 @@ export const execute: SkillHandler = async (
     }
   }
 
-  // エグゼクティブサマリー生成
-  const executiveSummary = {
-    headline: summary.total_cost === 0
-      ? '分析対象期間のコストデータがありません'
-      : `総コスト ${summary.total_cost.toFixed(2)} USD（前期比 ${(summary.period_over_period_change * 100).toFixed(1)}%）`,
-    key_insights: summary.total_cost === 0
+  if (executiveSummary.key_insights.length === 0) {
+    executiveSummary.key_insights = summary.total_cost === 0
       ? ['スキル実行が記録されていません']
-      : ['コスト構造は安定しています'],
-    action_items: recommendations.map(r => r.title),
-  };
+      : ['コスト構造は安定しています'];
+  }
+
+  if (executiveSummary.action_items.length === 0) {
+    executiveSummary.action_items = recommendations.map(r => r.title);
+  }
 
   const output: Output = {
     period: {

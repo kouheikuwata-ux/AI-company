@@ -159,7 +159,7 @@ export const spec: SkillSpec = {
     input_contains_pii: true,
     output_contains_pii: false,
     pii_fields: ['feedback_text'],
-    handling: 'FILTER',
+    handling: 'MASK_BEFORE_LLM',
   },
 
   llm_policy: {
@@ -368,8 +368,78 @@ export const execute: SkillHandler = async (
     },
   };
 
-  // トレンド分析（オプション）
-  if (parsed.include_trends) {
+  // LLMを使用してトレンド分析と洞察を生成
+  if (parsed.include_trends || totalCount > 0) {
+    try {
+      const systemPrompt = `あなたはカスタマーサクセスの専門家です。フィードバックデータを分析し、傾向と洞察を抽出します。
+- 対応提案は行わないでください（人間が判断）
+- 客観的な事実に基づいた分析のみ
+- カテゴリ分類の精度を重視`;
+
+      const feedbackSummary = feedbackItems.slice(0, 10).map(f =>
+        `[${f.source}] ${f.category}${f.subcategory ? '/' + f.subcategory : ''}: ${f.summary.slice(0, 100)}... (sentiment: ${f.sentiment})`
+      ).join('\n');
+
+      const userPrompt = `以下のフィードバックデータを分析し、トレンドと洞察を抽出してください。
+
+【全体サマリー】
+- 総件数: ${totalCount}
+- 平均センチメント: ${(totalCount > 0 ? totalSentiment / totalCount : 0).toFixed(2)}
+- ポジティブ: ${sentimentCounts.positive}件
+- ニュートラル: ${sentimentCounts.neutral}件
+- ネガティブ: ${sentimentCounts.negative}件
+
+【カテゴリ別】
+${categories.slice(0, 5).map(c => `- ${c.category}: ${c.count}件 (センチメント: ${c.avg_sentiment.toFixed(2)})`).join('\n') || 'なし'}
+
+【サンプルフィードバック】
+${feedbackSummary || 'なし'}
+
+JSON形式で返してください:
+{
+  "trends": {
+    "emerging_topics": ["トピック1", "トピック2"],
+    "declining_topics": ["トピック1"],
+    "volume_change_percent": 0,
+    "sentiment_change": 0
+  },
+  "insights": ["洞察1", "洞察2", "洞察3"]
+}`;
+
+      const response = await context.llm.chat({
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userPrompt }],
+        max_tokens: 800,
+        temperature: 0.3,
+      });
+
+      const jsonMatch = response.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        const result = JSON.parse(jsonMatch[0]);
+
+        if (parsed.include_trends && result.trends) {
+          output.trends = {
+            emerging_topics: result.trends.emerging_topics || [],
+            declining_topics: result.trends.declining_topics || [],
+            volume_change_percent: result.trends.volume_change_percent || 0,
+            sentiment_change: result.trends.sentiment_change || 0,
+          };
+        }
+      }
+    } catch (error) {
+      context.logger.warn('Failed to analyze trends via LLM', { error });
+
+      // フォールバック
+      if (parsed.include_trends) {
+        output.trends = {
+          emerging_topics: [],
+          declining_topics: [],
+          volume_change_percent: 0,
+          sentiment_change: 0,
+        };
+      }
+    }
+  } else if (parsed.include_trends) {
     output.trends = {
       emerging_topics: [],
       declining_topics: [],
@@ -381,14 +451,23 @@ export const execute: SkillHandler = async (
   context.logger.info('Feedback analysis completed', {
     total_feedback: totalCount,
     categories_found: categories.length,
+    used_llm: totalCount > 0,
   });
+
+  const estimatedInputTokens = spec.cost_model.estimated_tokens_input ?? 200;
+  const estimatedOutputTokens = spec.cost_model.estimated_tokens_output ?? 500;
 
   return {
     output,
-    actual_cost: spec.cost_model.fixed_cost,
+    actual_cost: spec.cost_model.fixed_cost +
+      (totalCount > 0
+        ? (estimatedInputTokens / 1000) * spec.cost_model.per_token_input +
+          (estimatedOutputTokens / 1000) * spec.cost_model.per_token_output
+        : 0),
     metadata: {
       skill_type: 'feedback_analysis',
       period: parsed.period,
+      used_llm: totalCount > 0,
     },
   };
 };
