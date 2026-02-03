@@ -24,7 +24,7 @@
   "dependencies": {
     "@ai-company-os/skill-spec": "workspace:*",
     "@ai-company-os/database": "workspace:*",
-    "@anthropic-ai/sdk": "^0.17.1",
+    "@anthropic-ai/sdk": "^0.72.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
