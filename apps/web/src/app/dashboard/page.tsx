@@ -3,7 +3,6 @@ import { agentRegistry } from '@ai-company-os/agents';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/auth/helpers';
 import {
-  MetricCard,
   AgentStatusCard,
   ExecutionTimeline,
   SkillStatsCard,

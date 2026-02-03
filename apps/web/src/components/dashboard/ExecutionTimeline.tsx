@@ -98,7 +98,7 @@ export function ExecutionTimeline({ executions, maxItems = 10 }: ExecutionTimeli
         <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-gray-200 dark:bg-gray-700" />
 
         <ul className="space-y-4">
-          {displayExecutions.map((exec, index) => {
+          {displayExecutions.map((exec) => {
             const style = stateStyles[exec.state] || stateStyles.CREATED;
 
             return (

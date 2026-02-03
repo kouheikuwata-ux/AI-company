@@ -2,11 +2,6 @@ import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getAuthenticatedUser } from '@/lib/auth/helpers';
 
-interface StateCount {
-  state: string;
-  count: number;
-}
-
 interface SkillStats {
   skill_key: string;
   total: number;
