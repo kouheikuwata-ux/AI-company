@@ -5,10 +5,6 @@
     {
       "path": "/api/system/self-check/run",
       "schedule": "0 21 * * *"
-    },
-    {
-      "path": "/api/inngest",
-      "schedule": "*/5 * * * *"
     }
   ],
   "headers": [
