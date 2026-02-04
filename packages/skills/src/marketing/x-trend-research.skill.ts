@@ -183,9 +183,9 @@ export const spec: SkillSpec = {
 };
 
 /**
- * モック投稿データ生成（本番ではX APIを使用）
+ * 注入される投稿データの型（X APIから取得したデータ）
  */
-function generateMockPosts(keywords: string[], limit: number): Array<{
+interface InjectedTweet {
   id: string;
   author: {
     username: string;
@@ -201,7 +201,18 @@ function generateMockPosts(keywords: string[], limit: number): Array<{
     replies: number;
     views?: number;
   };
-}> {
+}
+
+interface InjectedXData {
+  tweets: InjectedTweet[];
+  source: 'x_api' | 'mock';
+  fetched_at: string;
+}
+
+/**
+ * モック投稿データ生成（X API未設定時のフォールバック）
+ */
+function generateMockPosts(keywords: string[], limit: number): InjectedTweet[] {
   const mockAuthors = [
     { username: 'tech_insider_jp', display_name: 'テックインサイダー', followers_count: 125000, verified: true },
     { username: 'startup_ceo', display_name: 'スタートアップCEO', followers_count: 45000, verified: false },
@@ -218,7 +229,7 @@ function generateMockPosts(keywords: string[], limit: number): Array<{
     `${keywords[0]}の実態調査レポートを公開。意外な結果として、BtoB領域での活用が急増。`,
   ];
 
-  const posts = [];
+  const posts: InjectedTweet[] = [];
   const now = new Date();
 
   for (let i = 0; i < Math.min(limit, mockContents.length * 2); i++) {
@@ -270,17 +281,21 @@ export const execute: SkillHandler = async (
 ) => {
   const parsed = inputSchema.parse(input);
 
+  const now = new Date();
+
+  // 注入されたX APIデータを確認
+  const injectedData = input._xdata as InjectedXData | undefined;
+  const dataSource = injectedData?.source || 'mock';
+
   context.logger.info('Starting X trend research', {
     keywords: parsed.keywords,
     period: parsed.period,
     limit: parsed.limit,
+    data_source: dataSource,
   });
 
-  const now = new Date();
-
-  // 投稿データ取得（本番ではX APIを呼び出し）
-  // TODO: X API連携実装時にここを置き換え
-  const rawPosts = generateMockPosts(parsed.keywords, parsed.limit);
+  // 投稿データ取得（X APIデータがあれば使用、なければモック）
+  const rawPosts: InjectedTweet[] = injectedData?.tweets || generateMockPosts(parsed.keywords, parsed.limit);
 
   // エンゲージメントフィルタリング
   const filteredPosts = rawPosts.filter(post =>

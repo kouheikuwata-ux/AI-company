@@ -8,6 +8,7 @@
  * - イベントは複数のエージェントをトリガーできる
  * - 条件が設定されている場合は評価する
  * - 全てのトリガーは監査ログに記録
+ * - Inngestの制限（10トリガー/関数）に対応するため複数関数に分割
  */
 
 import { inngest } from '../client';
@@ -66,14 +67,95 @@ function evaluateCondition(condition: string | undefined, eventData: EventData):
 }
 
 /**
- * 汎用イベントハンドラー
- *
- * 全てのエージェントイベントをキャッチし、適切なエージェントにルーティング
+ * 共通のイベント処理ロジック
  */
-export const agentEventHandler = inngest.createFunction(
+async function processAgentEvent(
+  eventType: string,
+  eventData: EventData,
+  step: {
+    sendEvent: (id: string, event: { name: string; data: unknown }) => Promise<unknown>;
+  }
+) {
+  console.log(`[Agent Event Handler] Received event: ${eventType}`);
+
+  // このイベントをトリガーとして持つエージェントを取得
+  const triggeredAgents = agentRegistry.getAgentsForEvent(eventType);
+
+  if (triggeredAgents.length === 0) {
+    console.log(`[Agent Event Handler] No agents configured for event: ${eventType}`);
+    return { status: 'no_handlers', event_type: eventType };
+  }
+
+  const results: Array<{
+    agent: string;
+    skill: string;
+    status: 'triggered' | 'skipped';
+    reason?: string;
+  }> = [];
+
+  // 各エージェントのトリガーを処理
+  for (const { agent, trigger } of triggeredAgents) {
+    // 条件評価
+    const conditionMet = evaluateCondition(trigger.condition, eventData);
+
+    if (!conditionMet) {
+      results.push({
+        agent: agent.key,
+        skill: trigger.skill_key,
+        status: 'skipped',
+        reason: `Condition not met: ${trigger.condition}`,
+      });
+      continue;
+    }
+
+    // スキル実行イベントを発行
+    await step.sendEvent(`trigger-${agent.key}-${trigger.skill_key}`, {
+      name: 'skill/execute.requested',
+      data: {
+        skill_key: trigger.skill_key,
+        input: {
+          ...(trigger.default_input || {}),
+          _event: eventData,
+          _event_type: eventType,
+        },
+        idempotency_key: `event-${eventType}-${agent.key}-${Date.now()}`,
+        executor_type: 'agent',
+        executor_id: agent.id,
+        legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
+        responsibility_level: agent.max_responsibility_level,
+        tenant_id: SYSTEM_TENANT_ID,
+        trace_id: randomUUID(),
+        request_origin: 'triggered',
+      },
+    });
+
+    results.push({
+      agent: agent.key,
+      skill: trigger.skill_key,
+      status: 'triggered',
+    });
+
+    console.log(`[Agent Event Handler] Triggered ${agent.key} -> ${trigger.skill_key}`);
+  }
+
+  return {
+    status: 'processed',
+    event_type: eventType,
+    agents_triggered: results.filter(r => r.status === 'triggered').length,
+    agents_skipped: results.filter(r => r.status === 'skipped').length,
+    results,
+  };
+}
+
+/**
+ * イベントハンドラー Group 1: Budget/Cost + System/Engineering events (8 events)
+ * - CFO: budget.*, cost.*, execution.cost_spike
+ * - CTO: system.*, skill.latency_degradation, security.vulnerability_detected, deployment.*
+ */
+export const agentEventHandlerGroup1 = inngest.createFunction(
   {
-    id: 'agent-event-handler',
-    name: 'Agent Event Handler',
+    id: 'agent-event-handler-group1',
+    name: 'Agent Event Handler - Budget & System',
   },
   [
     // Budget/Cost events (CFO)
@@ -87,7 +169,23 @@ export const agentEventHandler = inngest.createFunction(
     { event: 'skill.latency_degradation' },
     { event: 'security.vulnerability_detected' },
     { event: 'deployment.failed' },
+  ],
+  async ({ event, step }) => {
+    return processAgentEvent(event.name, event.data as EventData, step);
+  }
+);
 
+/**
+ * イベントハンドラー Group 2: Customer + Audit/Security events (7 events)
+ * - CS Manager: feedback.*, usage.*, user.*
+ * - Auditor: security.suspicious_activity, policy.*, pii.*, permission.*
+ */
+export const agentEventHandlerGroup2 = inngest.createFunction(
+  {
+    id: 'agent-event-handler-group2',
+    name: 'Agent Event Handler - Customer & Audit',
+  },
+  [
     // Customer events (CS Manager)
     { event: 'feedback.negative' },
     { event: 'usage.anomaly' },
@@ -98,7 +196,25 @@ export const agentEventHandler = inngest.createFunction(
     { event: 'policy.violation_detected' },
     { event: 'pii.detected_in_logs' },
     { event: 'permission.elevated' },
+  ],
+  async ({ event, step }) => {
+    return processAgentEvent(event.name, event.data as EventData, step);
+  }
+);
 
+/**
+ * イベントハンドラー Group 3: Analytics + HR + Operations + Escalation events (9 events)
+ * - Analyst: metrics.*, report.*
+ * - HR Manager: request.*, skill.performance_degraded, skill.version_published
+ * - COO: workflow.*, task.*, execution.failure_rate_high
+ * - CEO: escalation.critical
+ */
+export const agentEventHandlerGroup3 = inngest.createFunction(
+  {
+    id: 'agent-event-handler-group3',
+    name: 'Agent Event Handler - Analytics, HR & Operations',
+  },
+  [
     // Analytics events (Analyst)
     { event: 'metrics.threshold_breach' },
     { event: 'report.requested' },
@@ -117,78 +233,7 @@ export const agentEventHandler = inngest.createFunction(
     { event: 'escalation.critical' },
   ],
   async ({ event, step }) => {
-    const eventType = event.name;
-    const eventData = event.data as EventData;
-
-    console.log(`[Agent Event Handler] Received event: ${eventType}`);
-
-    // このイベントをトリガーとして持つエージェントを取得
-    const triggeredAgents = agentRegistry.getAgentsForEvent(eventType);
-
-    if (triggeredAgents.length === 0) {
-      console.log(`[Agent Event Handler] No agents configured for event: ${eventType}`);
-      return { status: 'no_handlers', event_type: eventType };
-    }
-
-    const results: Array<{
-      agent: string;
-      skill: string;
-      status: 'triggered' | 'skipped';
-      reason?: string;
-    }> = [];
-
-    // 各エージェントのトリガーを処理
-    for (const { agent, trigger } of triggeredAgents) {
-      // 条件評価
-      const conditionMet = evaluateCondition(trigger.condition, eventData);
-
-      if (!conditionMet) {
-        results.push({
-          agent: agent.key,
-          skill: trigger.skill_key,
-          status: 'skipped',
-          reason: `Condition not met: ${trigger.condition}`,
-        });
-        continue;
-      }
-
-      // スキル実行イベントを発行
-      await step.sendEvent(`trigger-${agent.key}-${trigger.skill_key}`, {
-        name: 'skill/execute.requested',
-        data: {
-          skill_key: trigger.skill_key,
-          input: {
-            ...(trigger.default_input || {}),
-            _event: eventData,
-            _event_type: eventType,
-          },
-          idempotency_key: `event-${eventType}-${agent.key}-${Date.now()}`,
-          executor_type: 'agent',
-          executor_id: agent.id,
-          legal_responsible_user_id: SYSTEM_ADMIN_USER_ID,
-          responsibility_level: agent.max_responsibility_level,
-          tenant_id: SYSTEM_TENANT_ID,
-          trace_id: randomUUID(),
-          request_origin: 'triggered',
-        },
-      });
-
-      results.push({
-        agent: agent.key,
-        skill: trigger.skill_key,
-        status: 'triggered',
-      });
-
-      console.log(`[Agent Event Handler] Triggered ${agent.key} -> ${trigger.skill_key}`);
-    }
-
-    return {
-      status: 'processed',
-      event_type: eventType,
-      agents_triggered: results.filter(r => r.status === 'triggered').length,
-      agents_skipped: results.filter(r => r.status === 'skipped').length,
-      results,
-    };
+    return processAgentEvent(event.name, event.data as EventData, step);
   }
 );
 
@@ -330,7 +375,9 @@ export const agentMessageHandler = inngest.createFunction(
 
 // Export all functions
 export const agentEventTriggerFunctions = [
-  agentEventHandler,
+  agentEventHandlerGroup1,
+  agentEventHandlerGroup2,
+  agentEventHandlerGroup3,
   escalationNotificationHandler,
   agentMessageHandler,
 ];

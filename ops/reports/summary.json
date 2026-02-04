@@ -1,23 +1,21 @@
 {
-  "generated_at": "2026-02-02T14:34:51.179Z",
-  "run_timestamp": "2026-02-02T14:34:42.577Z",
+  "generated_at": "2026-02-02T16:24:50.177Z",
+  "run_timestamp": "2026-02-02T16:24:40.036Z",
   "issues": {
     "P0": [],
-    "P1": [
-      {
-        "priority": "P1",
-        "category": "deprecation-check",
-        "title": "Deprecation check failed",
-        "description": "SUPABASE_SERVICE_ROLE_KEY not set",
-        "recommendation": "Check SUPABASE_SERVICE_ROLE_KEY and DB connection"
-      }
-    ],
+    "P1": [],
     "P2": []
   },
+  "skipped_checks": [
+    {
+      "name": "deprecation-check",
+      "reason": "SUPABASE_SERVICE_ROLE_KEY not set"
+    }
+  ],
   "regressions": [],
   "improvements": [],
-  "overall_health": "warning",
+  "overall_health": "healthy",
   "next_actions": [
-    "📋 P1: Schedule fixes for P1 issues"
+    "✅ All systems healthy. No immediate action required."
   ]
 }
